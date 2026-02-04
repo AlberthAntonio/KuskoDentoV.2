@@ -14,7 +14,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 
@@ -35,7 +34,7 @@ function AppointmentsContent() {
     observations: '',
     status: 'Asignado' as 'Asignado' | 'Atendido',
     cost: 0,
-    applyDiscount: false,
+    discount: 0,
     paidAmount: 0,
     patientSearch: '',
   });
@@ -70,8 +69,12 @@ function AppointmentsContent() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     const doctor = users.find(u => u.id === form.doctorId);
-    const costFinal = form.applyDiscount ? form.cost * 0.9 : form.cost; // Ejemplo 10% descuento
-    const balance = costFinal - form.paidAmount;
+    
+    // Lógica financiera: Costo final = Costo base - Descuento
+    const costFinal = Math.max(0, form.cost - form.discount);
+    // Saldo = Costo final - Pagado hoy (no puede ser negativo)
+    const paidToday = Math.min(costFinal, form.paidAmount);
+    const balance = Math.max(0, costFinal - paidToday);
 
     const appointment: Appointment = {
       id: crypto.randomUUID(),
@@ -84,24 +87,23 @@ function AppointmentsContent() {
       observations: form.observations,
       status: form.status,
       cost: costFinal,
-      applyDiscount: form.applyDiscount,
-      paidAmount: form.paidAmount,
+      applyDiscount: form.discount > 0,
+      paidAmount: paidToday,
       balance: balance,
     };
 
     await db.put('appointments', appointment);
 
-    // Si hubo un pago, registrarlo
-    if (form.paidAmount > 0) {
+    if (paidToday > 0) {
       const treatment = treatments.find(t => t.id === form.treatmentId);
       const payment: Payment = {
         id: crypto.randomUUID(),
         patientId: form.patientId,
         appointmentId: appointment.id,
         treatmentName: treatment?.name || 'Varios',
-        amount: form.paidAmount,
+        amount: paidToday,
         totalCost: costFinal,
-        totalPaid: form.paidAmount,
+        totalPaid: paidToday,
         balance: balance,
         date: form.date,
         time: form.time,
@@ -111,7 +113,11 @@ function AppointmentsContent() {
     }
 
     setIsOpen(false);
-    toast({ title: "Cita Agendada", description: `Cita para el paciente registrada con éxito.` });
+    toast({ title: "Cita Agendada", description: `Cita registrada con éxito. Saldo pendiente: S/. ${balance.toFixed(2)}` });
+    setForm({
+      patientId: '', treatmentId: '', doctorId: '', date: '', time: '', 
+      observations: '', status: 'Asignado', cost: 0, discount: 0, paidAmount: 0, patientSearch: ''
+    });
     load();
   };
 
@@ -119,6 +125,9 @@ function AppointmentsContent() {
     p.names.toLowerCase().includes(form.patientSearch.toLowerCase()) || 
     p.lastNames.toLowerCase().includes(form.patientSearch.toLowerCase())
   );
+
+  const finalPricePreview = Math.max(0, form.cost - form.discount);
+  const balancePreview = Math.max(0, finalPricePreview - form.paidAmount);
 
   return (
     <AppLayout>
@@ -135,7 +144,7 @@ function AppointmentsContent() {
                 Nueva Cita
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[600px]">
+            <DialogContent className="sm:max-w-[700px]">
               <DialogHeader>
                 <DialogTitle>Programar Nueva Cita</DialogTitle>
               </DialogHeader>
@@ -151,12 +160,12 @@ function AppointmentsContent() {
                       onChange={e => setForm({...form, patientSearch: e.target.value})}
                     />
                   </div>
-                  {form.patientSearch && (
-                    <div className="border rounded-md max-h-32 overflow-y-auto mt-1">
+                  {form.patientSearch && form.patientId === '' && (
+                    <div className="border rounded-md max-h-32 overflow-y-auto mt-1 bg-white shadow-lg z-50">
                       {filteredPatientList.map(p => (
                         <div 
                           key={p.id} 
-                          className={`p-2 cursor-pointer hover:bg-muted text-sm ${form.patientId === p.id ? 'bg-primary/10' : ''}`}
+                          className="p-2 cursor-pointer hover:bg-muted text-sm border-b last:border-0"
                           onClick={() => setForm({...form, patientId: p.id, patientSearch: `${p.lastNames}, ${p.names}`})}
                         >
                           {p.lastNames}, {p.names} (DNI: {p.dni})
@@ -202,22 +211,22 @@ function AppointmentsContent() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Costo (S/.)</Label>
-                  <Input type="number" step="0.01" value={form.cost} onChange={e => setForm({...form, cost: parseFloat(e.target.value)})} />
+                  <Label>Costo Base (S/.)</Label>
+                  <Input type="number" step="0.01" value={form.cost} onChange={e => setForm({...form, cost: parseFloat(e.target.value) || 0})} />
                 </div>
 
                 <div className="space-y-2">
-                  <Label>¿Pago hoy? (S/.)</Label>
-                  <Input type="number" step="0.01" value={form.paidAmount} onChange={e => setForm({...form, paidAmount: parseFloat(e.target.value)})} />
+                  <Label>Descuento Directo (S/.)</Label>
+                  <Input type="number" step="0.01" value={form.discount} onChange={e => setForm({...form, discount: parseFloat(e.target.value) || 0})} className="text-emerald-600 font-bold" />
                 </div>
 
-                <div className="flex items-center gap-2 pt-4">
-                  <Checkbox id="discount" checked={form.applyDiscount} onCheckedChange={v => setForm({...form, applyDiscount: !!v})} />
-                  <Label htmlFor="discount">Aplicar Descuento (10%)</Label>
+                <div className="space-y-2">
+                  <Label>Pago a cuenta hoy (S/.)</Label>
+                  <Input type="number" step="0.01" value={form.paidAmount} onChange={e => setForm({...form, paidAmount: parseFloat(e.target.value) || 0})} />
                 </div>
 
-                <div className="space-y-2 pt-2">
-                  <Label>Estado</Label>
+                <div className="space-y-2">
+                  <Label>Estado de la Cita</Label>
                   <Select onValueChange={v => setForm({...form, status: v as any})} defaultValue="Asignado">
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -227,8 +236,19 @@ function AppointmentsContent() {
                   </Select>
                 </div>
 
+                <div className="col-span-2 bg-muted/50 p-4 rounded-lg grid grid-cols-2 gap-4">
+                  <div>
+                    <span className="text-xs text-muted-foreground uppercase">Costo Final</span>
+                    <p className="text-xl font-bold">S/. {finalPricePreview.toFixed(2)}</p>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-xs text-muted-foreground uppercase">Saldo Restante</span>
+                    <p className="text-xl font-bold text-amber-600">S/. {balancePreview.toFixed(2)}</p>
+                  </div>
+                </div>
+
                 <DialogFooter className="col-span-2 pt-4">
-                  <Button type="submit" className="w-full h-12">Guardar Cita</Button>
+                  <Button type="submit" className="w-full h-12" disabled={!form.patientId}>Guardar Cita</Button>
                 </DialogFooter>
               </form>
             </DialogContent>
@@ -237,16 +257,16 @@ function AppointmentsContent() {
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <Card className="md:col-span-1 border-none shadow-sm">
-             <CardHeader className="border-b pb-4"><CardTitle className="text-lg">Filtros</CardTitle></CardHeader>
+             <CardHeader className="border-b pb-4"><CardTitle className="text-lg">Filtros Rápidos</CardTitle></CardHeader>
              <CardContent className="pt-6 space-y-4">
                 <Button variant="secondary" className="w-full justify-start gap-2">Hoy</Button>
                 <Button variant="ghost" className="w-full justify-start gap-2">Mañana</Button>
-                <Button variant="outline" className="w-full justify-start gap-2 mt-4"><Filter className="w-4 h-4" /> Seleccionar Día</Button>
+                <Button variant="outline" className="w-full justify-start gap-2 mt-4"><Filter className="w-4 h-4" /> Todos los filtros</Button>
              </CardContent>
           </Card>
 
           <Card className="md:col-span-3 border-none shadow-sm p-6">
-             <h3 className="text-xl font-bold mb-6">Próximas Visitas</h3>
+             <h3 className="text-xl font-bold mb-6">Agenda Próxima</h3>
              <div className="border rounded-lg overflow-hidden">
                 <Table>
                   <TableHeader className="bg-muted/50">
@@ -254,7 +274,7 @@ function AppointmentsContent() {
                       <TableHead>Fecha/Hora</TableHead>
                       <TableHead>Paciente</TableHead>
                       <TableHead>Tratamiento</TableHead>
-                      <TableHead>Costo/Saldo</TableHead>
+                      <TableHead>Total / Saldo</TableHead>
                       <TableHead>Estado</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -269,12 +289,16 @@ function AppointmentsContent() {
                         </TableCell>
                         <TableCell>
                            <div className="font-medium flex items-center gap-2"><UserIcon className="w-3 h-3 text-primary" /> {a.patientName}</div>
-                           <div className="text-[10px] text-muted-foreground">Dr. {a.doctorName}</div>
+                           <div className="text-[10px] text-muted-foreground">Médico: {a.doctorName}</div>
                         </TableCell>
                         <TableCell className="text-xs">{a.treatmentName}</TableCell>
                         <TableCell>
                            <div className="font-bold">S/. {a.cost.toFixed(2)}</div>
-                           <div className="text-[10px] text-amber-600 font-bold">Saldo: S/. {a.balance.toFixed(2)}</div>
+                           {a.balance > 0 ? (
+                             <div className="text-[10px] text-amber-600 font-bold">Saldo: S/. {a.balance.toFixed(2)}</div>
+                           ) : (
+                             <div className="text-[10px] text-emerald-600 font-bold">Liquidado</div>
+                           )}
                         </TableCell>
                         <TableCell>
                            <Badge variant={a.status === 'Atendido' ? 'default' : 'secondary'} className={a.status === 'Atendido' ? 'bg-emerald-500' : ''}>
@@ -286,7 +310,7 @@ function AppointmentsContent() {
                     {appointments.length === 0 && (
                       <TableRow><TableCell colSpan={5} className="text-center py-20 text-muted-foreground">
                          <CalendarIcon className="w-12 h-12 mx-auto mb-4 opacity-10" />
-                         No hay citas programadas
+                         No hay registros
                       </TableCell></TableRow>
                     )}
                   </TableBody>
