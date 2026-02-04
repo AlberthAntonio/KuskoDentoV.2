@@ -1,55 +1,97 @@
+
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { AuthProvider } from '@/hooks/use-auth';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { db, Patient } from '@/lib/db';
+import { db, Patient, User } from '@/lib/db';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table';
 import { Card } from '@/components/ui/card';
-import { UserPlus, Search, Eye } from 'lucide-react';
+import { UserPlus, Search, Eye, Camera, X } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { Textarea } from '@/components/ui/textarea';
 import Link from 'next/link';
 
 function PatientsContent() {
   const [patients, setPatients] = useState<Patient[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [search, setSearch] = useState('');
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  
   const [newPatient, setNewPatient] = useState<Partial<Patient>>({
     dni: '',
     names: '',
     lastNames: '',
-    age: 0,
+    email: '',
     phone: '',
     address: '',
+    underTreatment: false,
+    proneToBleeding: false,
+    allergicToMeds: false,
+    allergiesDetail: '',
+    hypertensive: false,
+    diabetic: false,
+    pregnant: false,
+    consultationReason: '',
+    diagnostic: '',
+    medicalObservations: '',
+    attendedBy: '',
   });
 
   useEffect(() => {
-    loadPatients();
+    loadData();
   }, []);
 
-  const loadPatients = async () => {
-    const all = await db.getAll<Patient>('patients');
-    setPatients(all);
+  const loadData = async () => {
+    const allP = await db.getAll<Patient>('patients');
+    const allU = await db.getAll<User>('users');
+    setPatients(allP);
+    setUsers(allU);
   };
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
+    const dniFinal = newPatient.dni?.trim() === '' ? '00000000' : newPatient.dni;
+    
     const patient: Patient = {
       ...(newPatient as Patient),
       id: crypto.randomUUID(),
+      dni: dniFinal || '00000000',
+      photo: photoPreview || undefined,
       registrationDate: new Date().toLocaleDateString('es-PE'),
     };
     await db.put('patients', patient);
     setIsRegisterOpen(false);
-    setNewPatient({ dni: '', names: '', lastNames: '', age: 0, phone: '', address: '' });
-    loadPatients();
+    resetForm();
+    loadData();
+  };
+
+  const resetForm = () => {
+    setNewPatient({
+      dni: '', names: '', lastNames: '', email: '', phone: '', address: '',
+      underTreatment: false, proneToBleeding: false, allergicToMeds: false,
+      allergiesDetail: '', hypertensive: false, diabetic: false, pregnant: false,
+      consultationReason: '', diagnostic: '', medicalObservations: '', attendedBy: '',
+    });
+    setPhotoPreview(null);
+  };
+
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => setPhotoPreview(reader.result as string);
+      reader.readAsDataURL(file);
+    }
   };
 
   const filteredPatients = patients.filter(p => 
-    p.dni.includes(search) || 
     p.names.toLowerCase().includes(search.toLowerCase()) || 
     p.lastNames.toLowerCase().includes(search.toLowerCase())
   );
@@ -60,46 +102,127 @@ function PatientsContent() {
         <div className="flex justify-between items-center">
           <div>
             <h2 className="text-3xl font-bold text-primary">Pacientes</h2>
-            <p className="text-muted-foreground mt-1">Gestión integral de tu base de pacientes</p>
+            <p className="text-muted-foreground mt-1">Historial Clínico Digitalizado</p>
           </div>
           <Dialog open={isRegisterOpen} onOpenChange={setIsRegisterOpen}>
             <DialogTrigger asChild>
               <Button className="gap-2 h-12">
                 <UserPlus className="w-5 h-5" />
-                Registrar Paciente
+                Registrar Paciente & Historia
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[600px]">
+            <DialogContent className="sm:max-w-[95vw] md:max-w-[900px] h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>Nuevo Paciente</DialogTitle>
+                <DialogTitle>Registro Integral de Paciente</DialogTitle>
               </DialogHeader>
-              <form onSubmit={handleRegister} className="grid grid-cols-2 gap-4 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="dni">DNI / Documento</Label>
-                  <Input id="dni" value={newPatient.dni} onChange={e => setNewPatient({...newPatient, dni: e.target.value})} required />
+              <form onSubmit={handleRegister} className="grid grid-cols-1 md:grid-cols-2 gap-8 py-4">
+                {/* Datos Personales */}
+                <div className="space-y-4">
+                  <h3 className="font-bold text-lg border-b pb-2 flex items-center gap-2 text-primary">
+                    <UserPlus className="w-5 h-5" /> Datos del Paciente
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="dni">DNI (8 dígitos) - Opcional</Label>
+                      <Input id="dni" value={newPatient.dni} onChange={e => setNewPatient({...newPatient, dni: e.target.value.slice(0, 8)})} maxLength={8} placeholder="00000000" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="phone">Celular</Label>
+                      <Input id="phone" value={newPatient.phone} onChange={e => setNewPatient({...newPatient, phone: e.target.value})} required />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="names">Nombres</Label>
+                      <Input id="names" value={newPatient.names} onChange={e => setNewPatient({...newPatient, names: e.target.value})} required />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="lastNames">Apellidos</Label>
+                      <Input id="lastNames" value={newPatient.lastNames} onChange={e => setNewPatient({...newPatient, lastNames: e.target.value})} required />
+                    </div>
+                    <div className="space-y-2 col-span-2">
+                      <Label htmlFor="email">Correo Electrónico (Opcional)</Label>
+                      <Input id="email" type="email" value={newPatient.email} onChange={e => setNewPatient({...newPatient, email: e.target.value})} />
+                    </div>
+                    <div className="space-y-2 col-span-2">
+                      <Label htmlFor="address">Dirección</Label>
+                      <Input id="address" value={newPatient.address} onChange={e => setNewPatient({...newPatient, address: e.target.value})} required />
+                    </div>
+                    <div className="space-y-2 col-span-2">
+                      <Label>Foto del Paciente</Label>
+                      <div className="flex items-center gap-4">
+                        <div className="w-20 h-20 rounded-lg bg-muted border flex items-center justify-center overflow-hidden">
+                          {photoPreview ? <img src={photoPreview} className="w-full h-full object-cover" /> : <Camera className="w-8 h-8 opacity-20" />}
+                        </div>
+                        <Input type="file" accept="image/*" onChange={handlePhotoUpload} className="flex-1" />
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="age">Edad</Label>
-                  <Input id="age" type="number" value={newPatient.age} onChange={e => setNewPatient({...newPatient, age: parseInt(e.target.value)})} required />
+
+                {/* Historia Clínica */}
+                <div className="space-y-4">
+                  <h3 className="font-bold text-lg border-b pb-2 flex items-center gap-2 text-primary">
+                    <Eye className="w-5 h-5" /> Historia Clínica Inicial
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="flex items-center justify-between p-2 border rounded-md">
+                      <Label className="text-xs">Bajo tratamiento médico</Label>
+                      <Switch checked={newPatient.underTreatment} onCheckedChange={v => setNewPatient({...newPatient, underTreatment: v})} />
+                    </div>
+                    <div className="flex items-center justify-between p-2 border rounded-md">
+                      <Label className="text-xs">Propenso a hemorragia</Label>
+                      <Switch checked={newPatient.proneToBleeding} onCheckedChange={v => setNewPatient({...newPatient, proneToBleeding: v})} />
+                    </div>
+                    <div className="flex items-center justify-between p-2 border rounded-md">
+                      <Label className="text-xs">Hipertenso</Label>
+                      <Switch checked={newPatient.hypertensive} onCheckedChange={v => setNewPatient({...newPatient, hypertensive: v})} />
+                    </div>
+                    <div className="flex items-center justify-between p-2 border rounded-md">
+                      <Label className="text-xs">Diabético</Label>
+                      <Switch checked={newPatient.diabetic} onCheckedChange={v => setNewPatient({...newPatient, diabetic: v})} />
+                    </div>
+                    <div className="flex items-center justify-between p-2 border rounded-md col-span-2">
+                      <Label className="text-xs">¿Está embarazada?</Label>
+                      <Switch checked={newPatient.pregnant} onCheckedChange={v => setNewPatient({...newPatient, pregnant: v})} />
+                    </div>
+                    <div className="col-span-2 space-y-2">
+                      <div className="flex items-center justify-between p-2 border rounded-md">
+                        <Label className="text-xs font-bold">Alérgico a medicamentos</Label>
+                        <Switch checked={newPatient.allergicToMeds} onCheckedChange={v => setNewPatient({...newPatient, allergicToMeds: v})} />
+                      </div>
+                      {newPatient.allergicToMeds && (
+                        <Input placeholder="Especifique medicamentos..." value={newPatient.allergiesDetail} onChange={e => setNewPatient({...newPatient, allergiesDetail: e.target.value})} />
+                      )}
+                    </div>
+                    <div className="col-span-2 space-y-2">
+                      <Label>Motivo de la consulta</Label>
+                      <Input value={newPatient.consultationReason} onChange={e => setNewPatient({...newPatient, consultationReason: e.target.value})} required />
+                    </div>
+                    <div className="col-span-2 space-y-2">
+                      <Label>Diagnóstico Inicial</Label>
+                      <Textarea value={newPatient.diagnostic} onChange={e => setNewPatient({...newPatient, diagnostic: e.target.value})} />
+                    </div>
+                    <div className="col-span-2 space-y-2">
+                      <Label>Observaciones</Label>
+                      <Textarea value={newPatient.medicalObservations} onChange={e => setNewPatient({...newPatient, medicalObservations: e.target.value})} />
+                    </div>
+                    <div className="col-span-2 space-y-2">
+                      <Label>Atendido por</Label>
+                      <Select onValueChange={v => setNewPatient({...newPatient, attendedBy: v})}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Seleccione Doctor" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {users.map(u => (
+                            <SelectItem key={u.id} value={u.username}>{u.username}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="names">Nombres</Label>
-                  <Input id="names" value={newPatient.names} onChange={e => setNewPatient({...newPatient, names: e.target.value})} required />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="lastNames">Apellidos</Label>
-                  <Input id="lastNames" value={newPatient.lastNames} onChange={e => setNewPatient({...newPatient, lastNames: e.target.value})} required />
-                </div>
-                <div className="space-y-2 col-span-2">
-                  <Label htmlFor="phone">Teléfono</Label>
-                  <Input id="phone" value={newPatient.phone} onChange={e => setNewPatient({...newPatient, phone: e.target.value})} required />
-                </div>
-                <div className="space-y-2 col-span-2">
-                  <Label htmlFor="address">Dirección</Label>
-                  <Input id="address" value={newPatient.address} onChange={e => setNewPatient({...newPatient, address: e.target.value})} required />
-                </div>
-                <DialogFooter className="col-span-2 pt-4">
-                  <Button type="submit" className="w-full">Guardar Registro</Button>
+
+                <DialogFooter className="col-span-full pt-6">
+                  <Button type="submit" className="w-full h-12 text-lg">Guardar Registro Completo</Button>
                 </DialogFooter>
               </form>
             </DialogContent>
@@ -110,7 +233,7 @@ function PatientsContent() {
           <div className="relative mb-6">
             <Search className="absolute left-3 top-3 h-5 w-5 text-muted-foreground" />
             <Input 
-              placeholder="Buscar por DNI, nombre o apellido..." 
+              placeholder="Buscar por nombres o apellidos..." 
               className="pl-10 h-11"
               value={search}
               onChange={e => setSearch(e.target.value)}
@@ -123,9 +246,9 @@ function PatientsContent() {
                 <TableRow>
                   <TableHead>DNI</TableHead>
                   <TableHead>Paciente</TableHead>
-                  <TableHead>Edad</TableHead>
-                  <TableHead>Teléfono</TableHead>
+                  <TableHead>Celular</TableHead>
                   <TableHead>Registro</TableHead>
+                  <TableHead>Atendido por</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
@@ -134,10 +257,10 @@ function PatientsContent() {
                   filteredPatients.map((p) => (
                     <TableRow key={p.id}>
                       <TableCell className="font-medium">{p.dni}</TableCell>
-                      <TableCell>{p.lastNames}, {p.names}</TableCell>
-                      <TableCell>{p.age} años</TableCell>
+                      <TableCell className="font-bold">{p.lastNames}, {p.names}</TableCell>
                       <TableCell>{p.phone}</TableCell>
                       <TableCell>{p.registrationDate}</TableCell>
+                      <TableCell>Dr. {p.attendedBy}</TableCell>
                       <TableCell className="text-right">
                         <Button asChild variant="ghost" size="sm" className="gap-2">
                           <Link href={`/patients/${p.id}`}>
@@ -150,8 +273,9 @@ function PatientsContent() {
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-10 text-muted-foreground">
-                      No se encontraron pacientes
+                    <TableCell colSpan={6} className="text-center py-20 text-muted-foreground">
+                       <Search className="w-12 h-12 mx-auto mb-4 opacity-10" />
+                       No se encontraron pacientes registrados
                     </TableCell>
                   </TableRow>
                 )}

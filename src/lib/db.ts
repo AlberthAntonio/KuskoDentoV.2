@@ -1,7 +1,8 @@
+
 "use client";
 
 const DB_NAME = "KuskoDentoDB";
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 export interface User {
   id: string;
@@ -12,13 +13,27 @@ export interface User {
 
 export interface Patient {
   id: string;
-  dni: string;
+  dni: string; // Opcional, autollenado con ceros
   names: string;
   lastNames: string;
-  age: number;
+  email?: string;
   phone: string;
   address: string;
+  photo?: string; // dataUri
   registrationDate: string;
+  
+  // Historia Clínica
+  underTreatment: boolean;
+  proneToBleeding: boolean;
+  allergicToMeds: boolean;
+  allergiesDetail?: string;
+  hypertensive: boolean;
+  diabetic: boolean;
+  pregnant: boolean;
+  consultationReason: string;
+  diagnostic: string;
+  medicalObservations: string;
+  attendedBy: string; // Doctor Username
 }
 
 export interface Treatment {
@@ -27,22 +42,34 @@ export interface Treatment {
   price: number;
 }
 
-export interface PatientTreatment {
+export interface Appointment {
   id: string;
   patientId: string;
   treatmentId: string;
-  actualPrice: number;
+  doctorId: string;
+  doctorName: string;
   date: string;
-  notes?: string;
+  time: string;
+  observations: string;
+  status: 'Asignado' | 'Atendido';
+  cost: number;
+  applyDiscount: boolean;
+  paidAmount: number;
+  balance: number;
 }
 
 export interface Payment {
   id: string;
   patientId: string;
-  treatmentId: string;
+  appointmentId: string;
+  treatmentName: string;
   amount: number;
+  totalCost: number;
+  totalPaid: number;
+  balance: number;
   date: string;
-  type: 'Adelanto' | 'Saldo' | 'Cancelado';
+  time: string;
+  observations: string;
 }
 
 export interface Radiograph {
@@ -63,18 +90,10 @@ export interface Consent {
   date: string;
 }
 
-export interface Appointment {
-  id: string;
-  patientId: string;
-  date: string;
-  time: string;
-  doctor: string;
-}
-
 export interface Odontogram {
   id: string;
   patientId: string;
-  data: any; // JSON representation of tooth states
+  data: any;
   date: string;
 }
 
@@ -90,33 +109,16 @@ export class LocalDB {
       request.onupgradeneeded = (event) => {
         const db = (event.target as IDBOpenDBRequest).result;
         
-        if (!db.objectStoreNames.contains('users')) {
-          db.createObjectStore('users', { keyPath: 'id' });
-        }
-        if (!db.objectStoreNames.contains('patients')) {
-          db.createObjectStore('patients', { keyPath: 'id' });
-        }
-        if (!db.objectStoreNames.contains('treatments')) {
-          db.createObjectStore('treatments', { keyPath: 'id' });
-        }
-        if (!db.objectStoreNames.contains('patient_treatments')) {
-          db.createObjectStore('patient_treatments', { keyPath: 'id' });
-        }
-        if (!db.objectStoreNames.contains('payments')) {
-          db.createObjectStore('payments', { keyPath: 'id' });
-        }
-        if (!db.objectStoreNames.contains('radiographs')) {
-          db.createObjectStore('radiographs', { keyPath: 'id' });
-        }
-        if (!db.objectStoreNames.contains('consents')) {
-          db.createObjectStore('consents', { keyPath: 'id' });
-        }
-        if (!db.objectStoreNames.contains('appointments')) {
-          db.createObjectStore('appointments', { keyPath: 'id' });
-        }
-        if (!db.objectStoreNames.contains('odontograms')) {
-          db.createObjectStore('odontograms', { keyPath: 'id' });
-        }
+        const stores = [
+          'users', 'patients', 'treatments', 'appointments', 
+          'payments', 'radiographs', 'consents', 'odontograms'
+        ];
+
+        stores.forEach(store => {
+          if (!db.objectStoreNames.contains(store)) {
+            db.createObjectStore(store, { keyPath: 'id' });
+          }
+        });
       };
 
       request.onsuccess = (event) => {
@@ -180,14 +182,11 @@ export class LocalDB {
 
   async exportData(): Promise<string> {
     await this.init();
-    const stores = ['users', 'patients', 'treatments', 'patient_treatments', 'payments', 'radiographs', 'consents', 'appointments', 'odontograms'];
+    const stores = ['users', 'patients', 'treatments', 'appointments', 'payments', 'radiographs', 'consents', 'odontograms'];
     const data: any = {};
 
     for (const store of stores) {
       const items = await this.getAll(store);
-      // For blobs, we need to convert them to base64 or similar if we want a pure JSON backup.
-      // For simplicity in this demo, we'll try to serialize what we can.
-      // In a real app, blobs would be handled with FileReader.
       data[store] = await Promise.all(items.map(async (item: any) => {
         if (item.fileBlob) {
           const reader = new FileReader();
@@ -210,6 +209,7 @@ export class LocalDB {
     const stores = Object.keys(data);
 
     for (const storeName of stores) {
+      if (!this.db!.objectStoreNames.contains(storeName)) continue;
       const transaction = this.db!.transaction(storeName, 'readwrite');
       const store = transaction.objectStore(storeName);
       store.clear();
