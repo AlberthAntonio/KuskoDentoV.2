@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -6,7 +7,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { db, Appointment, Patient, Treatment, User, Payment } from '@/lib/db';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Plus, Calendar as CalendarIcon, Clock, User as UserIcon, Filter, Search } from 'lucide-react';
+import { Plus, Calendar as CalendarIcon, Clock, User as UserIcon, Filter, Search, Check } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
@@ -15,6 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 
 function AppointmentsContent() {
   const { toast } = useToast();
@@ -33,7 +35,7 @@ function AppointmentsContent() {
     observations: '',
     status: 'Asignado' as 'Asignado' | 'Atendido',
     cost: 0,
-    discount: 0,
+    discountAmount: 0,
     paidAmount: 0,
     patientSearch: '',
   });
@@ -68,7 +70,7 @@ function AppointmentsContent() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     const doctor = users.find(u => u.id === form.doctorId);
-    const finalCost = Math.max(0, form.cost - form.discount);
+    const finalCost = Math.max(0, form.cost - form.discountAmount);
     const paid = Math.min(finalCost, form.paidAmount);
     const balance = Math.max(0, finalCost - paid);
 
@@ -83,7 +85,7 @@ function AppointmentsContent() {
       observations: form.observations,
       status: form.status,
       cost: finalCost,
-      applyDiscount: form.discount > 0,
+      applyDiscount: form.discountAmount > 0,
       paidAmount: paid,
       balance: balance,
     };
@@ -110,7 +112,7 @@ function AppointmentsContent() {
 
     setIsOpen(false);
     toast({ title: "Cita Registrada", description: `Saldo: S/. ${balance.toFixed(2)}` });
-    setForm({ patientId: '', treatmentId: '', doctorId: '', date: '', time: '', observations: '', status: 'Asignado', cost: 0, discount: 0, paidAmount: 0, patientSearch: '' });
+    setForm({ patientId: '', treatmentId: '', doctorId: '', date: '', time: '', observations: '', status: 'Asignado', cost: 0, discountAmount: 0, paidAmount: 0, patientSearch: '' });
     load();
   };
 
@@ -120,7 +122,7 @@ function AppointmentsContent() {
     p.dni.includes(form.patientSearch)
   );
 
-  const previewFinal = Math.max(0, form.cost - form.discount);
+  const previewFinal = Math.max(0, form.cost - form.discountAmount);
   const previewBalance = Math.max(0, previewFinal - form.paidAmount);
 
   return (
@@ -141,19 +143,29 @@ function AppointmentsContent() {
               <DialogHeader><DialogTitle>Programar Cita</DialogTitle></DialogHeader>
               <form onSubmit={handleSave} className="grid grid-cols-2 gap-4 py-4">
                 <div className="col-span-2 space-y-2">
-                  <Label>Buscar Paciente (DNI o Nombre)</Label>
+                  <Label>Buscar Paciente (Escribe DNI o Nombre)</Label>
                   <div className="relative">
                     <Search className="absolute left-3 top-3 w-4 h-4 opacity-50" />
-                    <Input placeholder="Escriba para buscar..." className="pl-10" value={form.patientSearch} onChange={e => setForm({...form, patientSearch: e.target.value, patientId: ''})} />
+                    <Input 
+                      placeholder="Ej: 45678912 o Juan Pérez" 
+                      className="pl-10 h-11" 
+                      value={form.patientSearch} 
+                      onChange={e => setForm({...form, patientSearch: e.target.value, patientId: ''})} 
+                    />
                   </div>
                   {form.patientSearch && form.patientId === '' && (
-                    <div className="border rounded-md max-h-40 overflow-y-auto bg-white shadow-lg absolute w-full z-50">
-                      {filteredPatientList.map(p => (
-                        <div key={p.id} className="p-3 cursor-pointer hover:bg-primary/10 border-b flex justify-between items-center" onClick={() => setForm({...form, patientId: p.id, patientSearch: `${p.lastNames}, ${p.names} (${p.dni})`})}>
-                          <span>{p.lastNames}, {p.names}</span>
-                          <span className="text-xs text-muted-foreground font-mono">DNI: {p.dni}</span>
+                    <div className="border rounded-md max-h-40 overflow-y-auto bg-white shadow-xl absolute w-full z-50">
+                      {filteredPatientList.length > 0 ? filteredPatientList.map(p => (
+                        <div key={p.id} className="p-3 cursor-pointer hover:bg-primary/10 border-b flex justify-between items-center" onClick={() => setForm({...form, patientId: p.id, patientSearch: `${p.lastNames}, ${p.names} (DNI: ${p.dni})`})}>
+                          <div>
+                            <p className="font-bold">{p.lastNames}, {p.names}</p>
+                            <p className="text-[10px] text-muted-foreground">Celular: {p.phone}</p>
+                          </div>
+                          <Badge variant="outline" className="font-mono">DNI: {p.dni}</Badge>
                         </div>
-                      ))}
+                      )) : (
+                        <div className="p-4 text-center text-xs text-muted-foreground">No se encontró el paciente</div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -194,22 +206,22 @@ function AppointmentsContent() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Costo (S/.)</Label>
+                  <Label>Costo Base (S/.)</Label>
                   <Input type="number" step="0.01" value={form.cost} onChange={e => setForm({...form, cost: parseFloat(e.target.value) || 0})} />
                 </div>
 
                 <div className="space-y-2">
                   <Label>Descuento Directo (S/.)</Label>
-                  <Input type="number" step="0.01" value={form.discount} onChange={e => setForm({...form, discount: parseFloat(e.target.value) || 0})} className="text-emerald-600 font-bold" />
+                  <Input type="number" step="0.01" value={form.discountAmount} onChange={e => setForm({...form, discountAmount: parseFloat(e.target.value) || 0})} className="text-emerald-600 font-bold" />
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Abono hoy (S/.)</Label>
+                  <Label>Abono inicial (S/.)</Label>
                   <Input type="number" step="0.01" value={form.paidAmount} onChange={e => setForm({...form, paidAmount: parseFloat(e.target.value) || 0})} />
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Estado</Label>
+                  <Label>Estado de la Cita</Label>
                   <Select onValueChange={v => setForm({...form, status: v as any})} defaultValue="Asignado">
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -221,7 +233,7 @@ function AppointmentsContent() {
 
                 <div className="col-span-2 bg-muted p-4 rounded-lg flex justify-between items-center">
                   <div>
-                    <span className="text-[10px] uppercase font-bold text-muted-foreground">Total con Descuento</span>
+                    <span className="text-[10px] uppercase font-bold text-muted-foreground">Total Final</span>
                     <p className="text-lg font-bold">S/. {previewFinal.toFixed(2)}</p>
                   </div>
                   <div className="text-right">
@@ -230,7 +242,7 @@ function AppointmentsContent() {
                   </div>
                 </div>
 
-                <DialogFooter className="col-span-2 pt-4">
+                <DialogFooter className="col-span-full pt-4">
                   <Button type="submit" className="w-full h-12" disabled={!form.patientId}>Guardar Cita</Button>
                 </DialogFooter>
               </form>
