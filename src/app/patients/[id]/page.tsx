@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, use } from 'react';
@@ -48,7 +49,6 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // IndexedDB soporta Blobs directamente
     const data: any = {
       id: crypto.randomUUID(),
       patientId: id,
@@ -62,6 +62,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
     await db.put(store, data);
     toast({ title: "Archivo subido", description: "El documento se guardó correctamente." });
     loadAll();
+    e.target.value = ''; // Reset input
   };
 
   const downloadFile = (fileBlob: Blob, fileName: string) => {
@@ -195,19 +196,34 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
 
             <TabsContent value="radiographs">
                <div className="space-y-4">
-                 <div className="flex justify-between items-center bg-white p-4 rounded-lg shadow-sm">
+                 <div className="flex justify-between items-center bg-white p-4 rounded-lg shadow-sm border">
                    <h3 className="font-bold">Galería Radiográfica</h3>
-                   <label className="cursor-pointer">
-                      <Button asChild className="gap-2"><span className="flex items-center gap-2"><Upload className="w-4 h-4" /> Subir Placa</span></Button>
-                      <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload('radiograph', e)} />
-                   </label>
+                   <div className="relative">
+                      <Button className="gap-2 pointer-events-none">
+                        <Upload className="w-4 h-4" /> Subir Placa
+                      </Button>
+                      <input 
+                        type="file" 
+                        className="absolute inset-0 opacity-0 cursor-pointer" 
+                        accept="image/*" 
+                        onChange={(e) => handleFileUpload('radiograph', e)} 
+                      />
+                   </div>
                  </div>
                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
                    {radiographs.map(r => (
                      <Card key={r.id} className="overflow-hidden group relative border-none shadow-sm hover:shadow-md transition-all">
                        <div className="aspect-square bg-slate-100 flex items-center justify-center overflow-hidden">
                           {r.fileType.startsWith('image/') ? (
-                             <img src={URL.createObjectURL(r.fileBlob)} className="w-full h-full object-cover" />
+                             <img 
+                                src={URL.createObjectURL(r.fileBlob)} 
+                                className="w-full h-full object-cover" 
+                                alt={r.fileName}
+                                onLoad={(e) => {
+                                  // Optional: Revoke URL after load if memory is an issue, 
+                                  // but for snapshots it's easier to keep them.
+                                }}
+                             />
                           ) : (
                              <ImageIcon className="w-12 h-12 text-slate-300" />
                           )}
@@ -231,12 +247,19 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
 
             <TabsContent value="consents">
                <div className="space-y-4">
-                 <div className="flex justify-between items-center bg-white p-4 rounded-lg shadow-sm">
+                 <div className="flex justify-between items-center bg-white p-4 rounded-lg shadow-sm border">
                    <h3 className="font-bold">Documentos Firmados</h3>
-                   <label className="cursor-pointer">
-                      <Button asChild variant="outline" className="gap-2"><span className="flex items-center gap-2"><Upload className="w-4 h-4" /> Subir Archivo</span></Button>
-                      <input type="file" className="hidden" accept=".pdf,image/*" onChange={(e) => handleFileUpload('consent', e)} />
-                   </label>
+                   <div className="relative">
+                      <Button variant="outline" className="gap-2 pointer-events-none">
+                        <Upload className="w-4 h-4" /> Subir Archivo
+                      </Button>
+                      <input 
+                        type="file" 
+                        className="absolute inset-0 opacity-0 cursor-pointer" 
+                        accept=".pdf,image/*" 
+                        onChange={(e) => handleFileUpload('consent', e)} 
+                      />
+                   </div>
                  </div>
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                    {consents.map(c => (

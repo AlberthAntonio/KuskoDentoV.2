@@ -16,7 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 
-// FDI quadrants - Full List
+// FDI quadrants
 const quad1 = [18, 17, 16, 15, 14, 13, 12, 11];
 const quad2 = [21, 22, 23, 24, 25, 26, 27, 28];
 const quad4 = [48, 47, 46, 45, 44, 43, 42, 41];
@@ -164,6 +164,7 @@ function OdontogramContent({ id }: { id: string }) {
   return (
     <AppLayout>
       <div className="space-y-6 print:m-0 print:p-0">
+        {/* Print Header */}
         <div className="hidden print:block border-b-2 border-primary pb-4 mb-8">
           <div className="flex justify-between items-end">
             <div>
@@ -244,6 +245,7 @@ function OdontogramContent({ id }: { id: string }) {
           </CardHeader>
           <CardContent className="p-4 md:p-10">
             <div className="space-y-12">
+              {/* Upper Arch */}
               <div className="space-y-8">
                 <div className="flex flex-col items-center gap-4">
                   <h4 className="text-[9px] font-bold uppercase tracking-[0.2em] text-muted-foreground">Arcada Superior (Permanente & Decidua)</h4>
@@ -270,6 +272,7 @@ function OdontogramContent({ id }: { id: string }) {
 
               <div className="w-full border-t border-dashed border-slate-300 print:border-slate-400" />
 
+              {/* Lower Arch */}
               <div className="space-y-8">
                 <div className="flex flex-col items-center gap-4">
                   <div className="flex justify-center items-center gap-1 overflow-x-auto pb-4 w-full scrollbar-hide mb-4">
@@ -297,6 +300,7 @@ function OdontogramContent({ id }: { id: string }) {
           </CardContent>
         </Card>
 
+        {/* Legend */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 print:mt-10">
           <Card className="p-4 border-none shadow-sm bg-primary/5 print:bg-white print:border">
             <h5 className="font-bold flex items-center gap-2 mb-2"><Info className="w-4 h-4" /> Convenciones del Odontograma</h5>
@@ -333,6 +337,7 @@ function OdontogramContent({ id }: { id: string }) {
           </Card>
         </div>
 
+        {/* Print Signatures */}
         <div className="hidden print:block mt-20">
           <div className="flex justify-between items-center px-10">
             <div className="text-center border-t border-slate-400 pt-2 w-48">

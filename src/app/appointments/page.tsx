@@ -142,7 +142,7 @@ function AppointmentsContent() {
             <DialogContent className="sm:max-w-[700px]">
               <DialogHeader><DialogTitle>Programar Cita</DialogTitle></DialogHeader>
               <form onSubmit={handleSave} className="grid grid-cols-2 gap-4 py-4">
-                <div className="col-span-2 space-y-2">
+                <div className="col-span-2 space-y-2 relative">
                   <Label>Buscar Paciente (Escribe DNI o Nombre)</Label>
                   <div className="relative">
                     <Search className="absolute left-3 top-3 w-4 h-4 opacity-50" />
@@ -154,9 +154,13 @@ function AppointmentsContent() {
                     />
                   </div>
                   {form.patientSearch && form.patientId === '' && (
-                    <div className="border rounded-md max-h-40 overflow-y-auto bg-white shadow-xl absolute w-full z-50">
+                    <div className="border rounded-md max-h-48 overflow-y-auto bg-white shadow-2xl absolute w-full top-full mt-1 z-[100] border-primary/20">
                       {filteredPatientList.length > 0 ? filteredPatientList.map(p => (
-                        <div key={p.id} className="p-3 cursor-pointer hover:bg-primary/10 border-b flex justify-between items-center" onClick={() => setForm({...form, patientId: p.id, patientSearch: `${p.lastNames}, ${p.names} (DNI: ${p.dni})`})}>
+                        <div 
+                          key={p.id} 
+                          className="p-3 cursor-pointer hover:bg-primary/10 border-b flex justify-between items-center bg-white" 
+                          onClick={() => setForm({...form, patientId: p.id, patientSearch: `${p.lastNames}, ${p.names} (DNI: ${p.dni})`})}
+                        >
                           <div>
                             <p className="font-bold">{p.lastNames}, {p.names}</p>
                             <p className="text-[10px] text-muted-foreground">Celular: {p.phone}</p>
@@ -164,7 +168,7 @@ function AppointmentsContent() {
                           <Badge variant="outline" className="font-mono">DNI: {p.dni}</Badge>
                         </div>
                       )) : (
-                        <div className="p-4 text-center text-xs text-muted-foreground">No se encontró el paciente</div>
+                        <div className="p-4 text-center text-xs text-muted-foreground bg-white">No se encontró el paciente</div>
                       )}
                     </div>
                   )}
