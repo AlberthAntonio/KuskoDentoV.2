@@ -1,18 +1,22 @@
+
 "use client";
 
 const DB_NAME = "KuskoDentoDB";
-const DB_VERSION = 4;
+const DB_VERSION = 5;
+
+export type UserRole = 'superadmin' | 'clinic' | 'doctor' | 'assistant' | 'technician';
 
 export interface User {
   id: string;
   username: string;
   password?: string;
-  role: 'admin';
+  role: UserRole;
   fullName?: string;
   dni?: string;
   address?: string;
   photo?: string;
   colegiatura?: string;
+  clinicId?: string; // Para vincular personal a un consultorio
 }
 
 export interface Patient {
@@ -39,20 +43,14 @@ export interface Patient {
   diagnostic: string;
   medicalObservations: string;
   attendedBy: string;
+  clinicId?: string;
 }
 
 export interface Treatment {
   id: string;
   name: string;
   price: number;
-}
-
-export interface PatientTreatment {
-  id: string;
-  patientId: string;
-  treatmentId: string;
-  date: string;
-  actualPrice: number;
+  clinicId?: string;
 }
 
 export interface Appointment {
@@ -69,6 +67,7 @@ export interface Appointment {
   applyDiscount: boolean;
   paidAmount: number;
   balance: number;
+  clinicId?: string;
 }
 
 export interface PaymentHistory {
@@ -90,6 +89,7 @@ export interface Payment {
   time: string;
   observations: string;
   history?: PaymentHistory[];
+  clinicId?: string;
 }
 
 export interface Radiograph {

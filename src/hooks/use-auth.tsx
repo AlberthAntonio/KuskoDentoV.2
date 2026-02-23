@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, createContext, useContext } from 'react';
@@ -27,19 +28,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = async (username: string, password: string) => {
-    // Initial setup if no users exist
     const users = await db.getAll<User>('users');
-    if (users.length === 0 && username === 'admin' && password === 'admin') {
-      const newUser: User = { id: crypto.randomUUID(), username: 'admin', role: 'admin' };
-      await db.put('users', newUser);
-      setUser(newUser);
-      localStorage.setItem('kd_session', JSON.stringify(newUser));
+    
+    // Configuración inicial de Súper Usuario si no existe ningún usuario
+    if (users.length === 0 && username === 'superadmin' && password === 'superadmin') {
+      const superUser: User = { 
+        id: 'su-' + crypto.randomUUID(), 
+        username: 'superadmin', 
+        password: 'superadmin',
+        role: 'superadmin',
+        fullName: 'Administrador Maestro'
+      };
+      await db.put('users', superUser);
+      setUser(superUser);
+      localStorage.setItem('kd_session', JSON.stringify(superUser));
       return true;
     }
 
-    const foundUser = users.find(u => u.username === username);
+    const foundUser = users.find(u => u.username === username && u.password === password);
     if (foundUser) {
-      // In a real local app, we'd hash and check, but for this prototype:
       setUser(foundUser);
       localStorage.setItem('kd_session', JSON.stringify(foundUser));
       return true;
