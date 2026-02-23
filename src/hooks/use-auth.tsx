@@ -33,63 +33,70 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = async (username: string, password: string) => {
     const users = await db.getAll<User>('users');
+    let authenticatedUser: User | null = null;
     
     // 1. Verificar credenciales maestras de Super Administrador
     if (username === 'superadmin' && password === 'superadmin') {
       const existingSuper = users.find(u => u.username === 'superadmin');
       if (!existingSuper) {
-        const superUser: User = { 
+        authenticatedUser = { 
           id: 'su-admin-master', 
           username: 'superadmin', 
           password: 'superadmin',
           role: 'superadmin',
-          fullName: 'Súper Administrador'
+          fullName: 'Súper Administrador',
+          status: 'active',
+          lastLogin: new Date().toISOString()
         };
-        await db.put('users', superUser);
-        setUser(superUser);
-        localStorage.setItem('kd_session', JSON.stringify(superUser));
-        return true;
+        await db.put('users', authenticatedUser);
       } else {
-        setUser(existingSuper);
-        localStorage.setItem('kd_session', JSON.stringify(existingSuper));
-        return true;
+        authenticatedUser = { ...existingSuper, status: 'active', lastLogin: new Date().toISOString() };
+        await db.put('users', authenticatedUser);
       }
     }
-
     // 2. Verificar credenciales maestras de Consultorio
-    if (username === 'consultorio1' && password === 'consultorio1') {
+    else if (username === 'consultorio1' && password === 'consultorio1') {
       const existingClinic = users.find(u => u.username === 'consultorio1');
       if (!existingClinic) {
-        const clinicUser: User = { 
+        authenticatedUser = { 
           id: 'clinic-master-1', 
           username: 'consultorio1', 
           password: 'consultorio1',
           role: 'clinic',
-          fullName: 'Consultorio Dental 1'
+          fullName: 'Consultorio Dental 1',
+          status: 'active',
+          lastLogin: new Date().toISOString()
         };
-        await db.put('users', clinicUser);
-        setUser(clinicUser);
-        localStorage.setItem('kd_session', JSON.stringify(clinicUser));
-        return true;
+        await db.put('users', authenticatedUser);
       } else {
-        setUser(existingClinic);
-        localStorage.setItem('kd_session', JSON.stringify(existingClinic));
-        return true;
+        authenticatedUser = { ...existingClinic, status: 'active', lastLogin: new Date().toISOString() };
+        await db.put('users', authenticatedUser);
+      }
+    }
+    // 3. Buscar en la base de datos para el resto del personal
+    else {
+      const foundUser = users.find(u => u.username === username && u.password === password);
+      if (foundUser) {
+        authenticatedUser = { ...foundUser, status: 'active', lastLogin: new Date().toISOString() };
+        await db.put('users', authenticatedUser);
       }
     }
 
-    // 3. Buscar en la base de datos para el resto del personal
-    const foundUser = users.find(u => u.username === username && u.password === password);
-    if (foundUser) {
-      setUser(foundUser);
-      localStorage.setItem('kd_session', JSON.stringify(foundUser));
+    if (authenticatedUser) {
+      setUser(authenticatedUser);
+      localStorage.setItem('kd_session', JSON.stringify(authenticatedUser));
       return true;
     }
     
     return false;
   };
 
-  const logout = () => {
+  const logout = async () => {
+    if (user) {
+      // Marcar como inactivo al cerrar sesión
+      const updatedUser = { ...user, status: 'inactive' };
+      await db.put('users', updatedUser);
+    }
     setUser(null);
     localStorage.removeItem('kd_session');
     router.push('/login');

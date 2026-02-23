@@ -8,12 +8,13 @@ import { db, User, UserRole } from '@/lib/db';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
-import { Shield, Trash2, UserPlus, Lock, Edit2, Camera, MapPin, CreditCard, User as UserIcon, Building2, Stethoscope, Briefcase } from 'lucide-react';
+import { Shield, Trash2, UserPlus, Lock, Edit2, Camera, MapPin, CreditCard, User as UserIcon, Building2, Stethoscope, Briefcase, Clock, Circle } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
 
 function UsersContent() {
   const { toast } = useToast();
@@ -40,11 +41,9 @@ function UsersContent() {
     if (!currentUser) return;
     const all = await db.getAll<User>('users');
     
-    // El Súper Usuario ve todos los "Consultorios"
     if (currentUser.role === 'superadmin') {
       setUsers(all.filter(u => u.role === 'clinic'));
     } 
-    // El Consultorio ve a su personal
     else if (currentUser.role === 'clinic') {
       setUsers(all.filter(u => u.clinicId === currentUser.id));
     }
@@ -61,7 +60,6 @@ function UsersContent() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     if (!currentUser) return;
 
     const newUser: User = {
@@ -75,12 +73,13 @@ function UsersContent() {
       photo: photoPreview || undefined,
       role: currentUser.role === 'superadmin' ? 'clinic' : form.role,
       clinicId: currentUser.role === 'clinic' ? currentUser.id : undefined,
+      status: editingId ? (users.find(u => u.id === editingId)?.status || 'inactive') : 'inactive'
     };
 
     await db.put('users', newUser);
     setIsOpen(false);
     resetForm();
-    toast({ title: editingId ? 'Usuario actualizado' : 'Usuario creado' });
+    toast({ title: editingId ? 'Registro actualizado' : 'Registro creado' });
     load();
   };
 
@@ -99,7 +98,7 @@ function UsersContent() {
   };
 
   const handleDelete = async (id: string) => {
-    if (confirm('¿Eliminar este usuario?')) {
+    if (confirm('¿Eliminar este registro?')) {
       await db.delete('users', id);
       load();
     }
@@ -134,8 +133,8 @@ function UsersContent() {
             </h2>
             <p className="text-muted-foreground mt-1">
               {isSuperAdmin 
-                ? 'Administra los accesos para nuevas clínicas dentales' 
-                : 'Administra las cuentas de doctores, asistentes y técnicos'}
+                ? 'Administra los accesos y monitorea consultorios dentales' 
+                : 'Administra las cuentas de tu equipo clínico'}
             </p>
           </div>
           <Dialog open={isOpen} onOpenChange={(val) => {
@@ -151,7 +150,7 @@ function UsersContent() {
             <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>
-                  {editingId ? 'Editar Usuario' : isSuperAdmin ? 'Registrar Nuevo Consultorio' : 'Registrar Nuevo Personal'}
+                  {editingId ? 'Editar Registro' : isSuperAdmin ? 'Registrar Nuevo Consultorio' : 'Registrar Nuevo Personal'}
                 </DialogTitle>
               </DialogHeader>
               <form onSubmit={handleSave} className="space-y-4 py-4">
@@ -173,9 +172,9 @@ function UsersContent() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2 col-span-2">
                     <Label htmlFor="fullName">
-                      {isSuperAdmin ? 'Nombre del Consultorio / Clínica' : 'Nombre Completo'}
+                      {isSuperAdmin ? 'Nombre del Consultorio' : 'Nombre Completo'}
                     </Label>
-                    <Input id="fullName" value={form.fullName} onChange={e => setForm({...form, fullName: e.target.value})} required placeholder={isSuperAdmin ? "Ej: Clínica Dental Smile" : "Ej: Dr. Juan Pérez"} />
+                    <Input id="fullName" value={form.fullName} onChange={e => setForm({...form, fullName: e.target.value})} required placeholder={isSuperAdmin ? "Ej: Consultorio Dental Cusco" : "Ej: Dr. Juan Pérez"} />
                   </div>
                   
                   {!isSuperAdmin && (
@@ -210,7 +209,7 @@ function UsersContent() {
 
                   {(isSuperAdmin || form.role === 'doctor') && (
                     <div className="space-y-2">
-                      <Label htmlFor="colegiatura">N° Colegiatura / Registro</Label>
+                      <Label htmlFor="colegiatura">N° Registro / Colegiatura</Label>
                       <Input id="colegiatura" value={form.colegiatura} onChange={e => setForm({...form, colegiatura: e.target.value})} required={form.role === 'doctor'} />
                     </div>
                   )}
@@ -237,7 +236,7 @@ function UsersContent() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {users.map((u) => (
             <Card key={u.id} className="border-none shadow-sm hover:shadow-md transition-all group overflow-hidden">
-               <div className={`h-1 ${u.role === 'clinic' ? 'bg-indigo-500' : 'bg-primary/20'}`} />
+               <div className={`h-1 ${u.status === 'active' ? 'bg-emerald-500' : 'bg-slate-300'}`} />
                <CardHeader className="flex flex-row items-start gap-4 pb-4">
                  <Avatar className="w-16 h-16 rounded-xl">
                    <AvatarImage src={u.photo} />
@@ -246,7 +245,15 @@ function UsersContent() {
                    </AvatarFallback>
                  </Avatar>
                  <div className="flex-1 min-w-0">
-                   <CardTitle className="text-lg truncate">{u.fullName || u.username}</CardTitle>
+                   <div className="flex justify-between items-start">
+                    <CardTitle className="text-lg truncate">{u.fullName || u.username}</CardTitle>
+                    {isSuperAdmin && (
+                      <div className="flex items-center gap-1">
+                        <Circle className={cn("w-2 h-2 fill-current", u.status === 'active' ? 'text-emerald-500' : 'text-slate-300')} />
+                        <span className="text-[10px] font-bold text-muted-foreground">{u.status === 'active' ? 'Activo' : 'Desconectado'}</span>
+                      </div>
+                    )}
+                   </div>
                    <CardDescription className="flex items-center gap-1 mt-1 font-bold text-primary">
                      <Shield className="w-3 h-3" /> {
                        u.role === 'clinic' ? 'Consultorio' : 
@@ -259,7 +266,9 @@ function UsersContent() {
                <CardContent className="space-y-3">
                  <div className="text-xs space-y-2 text-muted-foreground">
                     <p className="flex items-center gap-2"><MapPin className="w-3 h-3" /> {u.address || 'Sin dirección'}</p>
-                    <p className="flex items-center gap-2 font-mono">ID: {u.dni || '---'}</p>
+                    {u.lastLogin && (
+                      <p className="flex items-center gap-2"><Clock className="w-3 h-3" /> Último acceso: {new Date(u.lastLogin).toLocaleString('es-PE')}</p>
+                    )}
                  </div>
                  <div className="flex gap-2 pt-2">
                    <Button variant="outline" size="sm" className="gap-2 flex-1" onClick={() => openEdit(u)}>

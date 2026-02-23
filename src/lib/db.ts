@@ -16,7 +16,9 @@ export interface User {
   address?: string;
   photo?: string;
   colegiatura?: string;
-  clinicId?: string; // Para vincular personal a un consultorio
+  clinicId?: string; 
+  lastLogin?: string;
+  status?: 'active' | 'inactive';
 }
 
 export interface Patient {
@@ -30,8 +32,6 @@ export interface Patient {
   photo?: string;
   age?: number;
   registrationDate: string;
-  
-  // Historia Clínica
   underTreatment: boolean;
   proneToBleeding: boolean;
   allergicToMeds: boolean;

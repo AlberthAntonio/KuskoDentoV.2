@@ -4,7 +4,7 @@
 import React from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { SidebarProvider, Sidebar, SidebarContent, SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarTrigger, SidebarInset } from '@/components/ui/sidebar';
-import { Users, UserSquare2, Stethoscope, Landmark, Activity, Calendar, Database, LogOut, LayoutDashboard, ShieldCheck } from 'lucide-react';
+import { Users, UserSquare2, Stethoscope, Landmark, Activity, Calendar, Database, LogOut, LayoutDashboard, ShieldCheck, BarChart3 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
@@ -16,7 +16,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   const isSuperAdmin = user.role === 'superadmin';
   const isClinic = user.role === 'clinic';
-  const isStaff = ['doctor', 'assistant', 'technician'].includes(user.role);
 
   const menuItems = [
     { 
@@ -24,6 +23,12 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       label: 'Panel Principal', 
       href: '/dashboard', 
       show: true 
+    },
+    { 
+      icon: BarChart3, 
+      label: 'Reportes', 
+      href: '/admin/reports', 
+      show: isSuperAdmin 
     },
     { 
       icon: UserSquare2, 
@@ -99,7 +104,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             <div className="mb-4 px-2">
               <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Rol Actual</p>
               <p className="text-xs font-medium text-primary bg-primary/5 py-1 px-2 rounded">
-                {user.role === 'superadmin' ? 'Super Usuario' : 
+                {user.role === 'superadmin' ? 'Súper Usuario' : 
                  user.role === 'clinic' ? 'Consultorio' : 
                  user.role === 'doctor' ? 'Doctor(a)' : 'Personal'}
               </p>
