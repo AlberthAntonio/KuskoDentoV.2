@@ -1,6 +1,7 @@
+
 "use client";
 
-import { AuthProvider } from '@/hooks/use-auth';
+import { AuthProvider, useAuth } from '@/hooks/use-auth';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,12 +12,19 @@ import { db, Patient } from '@/lib/db';
 import Link from 'next/link';
 
 function OdontogramContent() {
+  const { user } = useAuth();
   const [patients, setPatients] = useState<Patient[]>([]);
   const [search, setSearch] = useState('');
 
+  const clinicId = user?.role === 'clinic' ? user.id : user?.clinicId;
+
   useEffect(() => {
-    db.getAll<Patient>('patients').then(setPatients);
-  }, []);
+    if (user && clinicId) {
+      db.getAll<Patient>('patients').then(all => {
+        setPatients(all.filter(p => p.clinicId === clinicId));
+      });
+    }
+  }, [user, clinicId]);
 
   const filtered = patients.filter(p => 
     p.dni.includes(search) || p.names.toLowerCase().includes(search.toLowerCase()) || p.lastNames.toLowerCase().includes(search.toLowerCase())
@@ -60,6 +68,11 @@ function OdontogramContent() {
                 </CardContent>
               </Card>
             ))}
+            {filtered.length === 0 && (
+              <div className="col-span-full py-10 text-center text-muted-foreground">
+                No se encontraron pacientes para este consultorio.
+              </div>
+            )}
           </div>
         </Card>
       </div>

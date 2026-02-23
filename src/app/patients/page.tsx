@@ -1,7 +1,8 @@
+
 "use client";
 
 import { useState, useEffect } from 'react';
-import { AuthProvider } from '@/hooks/use-auth';
+import { AuthProvider, useAuth } from '@/hooks/use-auth';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { db, Patient, User } from '@/lib/db';
 import { Button } from '@/components/ui/button';
@@ -17,12 +18,15 @@ import { Textarea } from '@/components/ui/textarea';
 import Link from 'next/link';
 
 function PatientsContent() {
+  const { user } = useAuth();
   const [patients, setPatients] = useState<Patient[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [search, setSearch] = useState('');
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   
+  const clinicId = user?.role === 'clinic' ? user.id : user?.clinicId;
+
   const [newPatient, setNewPatient] = useState<Partial<Patient>>({
     dni: '',
     names: '',
@@ -44,18 +48,24 @@ function PatientsContent() {
   });
 
   useEffect(() => {
-    loadData();
-  }, []);
+    if (user) loadData();
+  }, [user]);
 
   const loadData = async () => {
+    if (!user || !clinicId) return;
     const allP = await db.getAll<Patient>('patients');
     const allU = await db.getAll<User>('users');
-    setPatients(allP);
-    setUsers(allU);
+    
+    // Filtrar pacientes solo del consultorio actual
+    setPatients(allP.filter(p => p.clinicId === clinicId));
+    // Filtrar doctores solo del consultorio actual
+    setUsers(allU.filter(u => u.id === clinicId || u.clinicId === clinicId));
   };
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!clinicId) return;
+
     const dniFinal = newPatient.dni?.trim() === '' ? '00000000' : newPatient.dni;
     
     const patient: Patient = {
@@ -64,7 +74,9 @@ function PatientsContent() {
       dni: dniFinal || '00000000',
       photo: photoPreview || undefined,
       registrationDate: new Date().toLocaleDateString('es-PE'),
+      clinicId: clinicId
     };
+
     await db.put('patients', patient);
     setIsRegisterOpen(false);
     resetForm();

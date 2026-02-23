@@ -1,7 +1,8 @@
+
 "use client";
 
 import { useState, useEffect } from 'react';
-import { AuthProvider } from '@/hooks/use-auth';
+import { AuthProvider, useAuth } from '@/hooks/use-auth';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { db, Treatment } from '@/lib/db';
 import { Button } from '@/components/ui/button';
@@ -12,27 +13,36 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Label } from '@/components/ui/label';
 
 function TreatmentsContent() {
+  const { user } = useAuth();
   const [treatments, setTreatments] = useState<Treatment[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [editing, setEditing] = useState<Treatment | null>(null);
   const [form, setForm] = useState({ name: '', price: '' });
 
+  const clinicId = user?.role === 'clinic' ? user.id : user?.clinicId;
+
   useEffect(() => {
-    load();
-  }, []);
+    if (user) load();
+  }, [user]);
 
   const load = async () => {
+    if (!user || !clinicId) return;
     const all = await db.getAll<Treatment>('treatments');
-    setTreatments(all);
+    // Filtrar solo los tratamientos de este consultorio
+    setTreatments(all.filter(t => t.clinicId === clinicId));
   };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!clinicId) return;
+
     const item: Treatment = {
       id: editing ? editing.id : crypto.randomUUID(),
       name: form.name,
       price: parseFloat(form.price),
+      clinicId: clinicId
     };
+
     await db.put('treatments', item);
     setIsOpen(false);
     setEditing(null);

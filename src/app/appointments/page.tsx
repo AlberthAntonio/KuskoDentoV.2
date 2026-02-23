@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -33,6 +34,8 @@ function AppointmentsContent() {
   const [filterType, setFilterType] = useState<'all' | 'today' | 'week' | 'specific'>('all');
   const [specificDate, setSpecificDate] = useState('');
   
+  const clinicId = currentUser?.role === 'clinic' ? currentUser.id : currentUser?.clinicId;
+
   const [form, setForm] = useState({
     patientId: '',
     treatmentId: '',
@@ -48,27 +51,35 @@ function AppointmentsContent() {
   });
 
   useEffect(() => {
-    load();
-  }, []);
+    if (currentUser) load();
+  }, [currentUser]);
 
   useEffect(() => {
     applyFilters();
   }, [rawAppointments, filterType, specificDate]);
 
   const load = async () => {
+    if (!currentUser || !clinicId) return;
+
     const allA = await db.getAll<Appointment>('appointments');
     const allP = await db.getAll<Patient>('patients');
     const allT = await db.getAll<Treatment>('treatments');
     const allU = await db.getAll<User>('users');
     
-    setPatients(allP);
-    setTreatments(allT);
-    setUsers(allU);
+    // Filtrar por consultorio
+    const myPatients = allP.filter(p => p.clinicId === clinicId);
+    const myTreatments = allT.filter(t => t.clinicId === clinicId);
+    const myUsers = allU.filter(u => u.id === clinicId || u.clinicId === clinicId);
+    const myAppointments = allA.filter(a => a.clinicId === clinicId);
 
-    const combined = allA.map(a => ({
+    setPatients(myPatients);
+    setTreatments(myTreatments);
+    setUsers(myUsers);
+
+    const combined = myAppointments.map(a => ({
       ...a,
-      patientName: allP.find(p => p.id === a.patientId)?.lastNames || 'Paciente',
-      treatmentName: allT.find(t => t.id === a.treatmentId)?.name || 'Tratamiento'
+      patientName: myPatients.find(p => p.id === a.patientId)?.lastNames || 'Paciente',
+      treatmentName: myTreatments.find(t => t.id === a.treatmentId)?.name || 'Tratamiento'
     }));
     setRawAppointments(combined);
   };
@@ -103,6 +114,7 @@ function AppointmentsContent() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!clinicId) return;
 
     // Validar duplicidad de hora para el mismo doctor
     const conflict = rawAppointments.find(a => 
@@ -139,6 +151,7 @@ function AppointmentsContent() {
       applyDiscount: form.discountAmount > 0,
       paidAmount: paid,
       balance: balance,
+      clinicId: clinicId
     };
 
     await db.put('appointments', appointment);
@@ -157,7 +170,8 @@ function AppointmentsContent() {
         date: form.date,
         time: form.time,
         observations: form.observations,
-        history: paid > 0 ? [{ date: form.date, time: form.time, amount: paid }] : []
+        history: paid > 0 ? [{ date: form.date, time: form.time, amount: paid }] : [],
+        clinicId: clinicId
       };
       await db.put('payments', payment);
     }
