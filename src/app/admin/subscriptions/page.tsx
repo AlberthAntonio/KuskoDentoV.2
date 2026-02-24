@@ -14,8 +14,9 @@ import { Search, CreditCard, Calendar, Clock, CheckCircle2, AlertTriangle, Landm
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { format, isAfter, parseISO, addDays, isBefore, addMonths, addYears } from 'date-fns';
+import { format, isAfter, parseISO, addDays, addMonths, addYears } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { cn } from '@/lib/utils';
 
 function SubscriptionsContent() {
   const { toast } = useToast();
@@ -84,7 +85,6 @@ function SubscriptionsContent() {
 
     await db.put('subscription_payments', payment);
     
-    // Actualizar datos del consultorio y reactivar si estaba suspendido
     const updatedClinic: User = {
       ...selectedClinic,
       nextPaymentDate: nextDate,
