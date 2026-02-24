@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -8,7 +7,7 @@ import { db, User, UserRole } from '@/lib/db';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
-import { Shield, Trash2, UserPlus, Camera, MapPin, User as UserIcon, Building2, Stethoscope, Briefcase, Clock, Circle } from 'lucide-react';
+import { Shield, Trash2, UserPlus, Camera, MapPin, User as UserIcon, Building2, Stethoscope, Briefcase, Clock, Circle, Edit2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -66,7 +65,6 @@ function UsersContent() {
 
     const newUser: User = {
       id: editingId || crypto.randomUUID(),
-      // Solo las clínicas tienen usuario y contraseña
       username: isCreatingClinic ? form.username : undefined,
       password: isCreatingClinic ? form.password : undefined,
       fullName: form.fullName,
@@ -196,7 +194,6 @@ function UsersContent() {
                     </div>
                   )}
 
-                  {/* Los campos de Login solo se muestran para Consultorios (creados por SuperAdmin) */}
                   {isSuperAdmin && (
                     <>
                       <div className="space-y-2">
