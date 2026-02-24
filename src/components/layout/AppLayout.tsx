@@ -4,7 +4,7 @@
 import React from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { SidebarProvider, Sidebar, SidebarContent, SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarTrigger, SidebarInset } from '@/components/ui/sidebar';
-import { Users, UserSquare2, Stethoscope, Landmark, Activity, Calendar, Database, LogOut, LayoutDashboard, ShieldCheck, BarChart3, CreditCard, AlertTriangle, QrCode, Building2, ShieldAlert } from 'lucide-react';
+import { Users, UserSquare2, Stethoscope, Landmark, Activity, Calendar, Database, LogOut, LayoutDashboard, ShieldCheck, BarChart3, CreditCard, AlertTriangle, QrCode, Building2, ShieldAlert, ReceiptText, Banknote } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
@@ -43,6 +43,18 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       show: isSuperAdmin 
     },
     { 
+      icon: Banknote, 
+      label: 'Pagos', 
+      href: '/admin/billing', 
+      show: isSuperAdmin 
+    },
+    { 
+      icon: isSuperAdmin ? ShieldCheck : Users, 
+      label: isSuperAdmin ? 'Consultorios' : 'Personal', 
+      href: '/admin/users', 
+      show: (isSuperAdmin || isClinic) && !isSuspended 
+    },
+    { 
       icon: UserSquare2, 
       label: 'Pacientes', 
       href: '/patients', 
@@ -56,7 +68,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     },
     { 
       icon: Landmark, 
-      label: 'Pagos', 
+      label: 'Pagos Pacientes', 
       href: '/payments', 
       show: !isSuperAdmin && !isSuspended 
     },
@@ -71,12 +83,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       label: 'Citas', 
       href: '/appointments', 
       show: !isSuperAdmin && !isSuspended 
-    },
-    { 
-      icon: isSuperAdmin ? ShieldCheck : Users, 
-      label: isSuperAdmin ? 'Consultorios' : 'Personal', 
-      href: '/admin/users', 
-      show: (isSuperAdmin || isClinic) && !isSuspended 
     },
     { 
       icon: Database, 
