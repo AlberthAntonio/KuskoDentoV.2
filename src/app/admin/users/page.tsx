@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -7,7 +8,7 @@ import { db, User, UserRole } from '@/lib/db';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
-import { Shield, Trash2, UserPlus, Camera, MapPin, User as UserIcon, Building2, Stethoscope, Briefcase, Clock, Circle, Edit2, CreditCard, Calendar, Calculator } from 'lucide-react';
+import { Shield, Trash2, UserPlus, Camera, MapPin, User as UserIcon, Building2, Stethoscope, Briefcase, Clock, Circle, Edit2, CreditCard, Calendar, ShieldAlert } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -35,16 +36,16 @@ function UsersContent() {
     nextPaymentDate: '',
     contractStartDate: new Date().toISOString().split('T')[0],
     paymentFrequency: 'monthly' as 'monthly' | 'yearly',
-    advanceInstallments: '1'
+    advanceInstallments: '1',
+    subscriptionStatus: 'active' as 'active' | 'suspended' | 'blocked'
   });
 
   useEffect(() => {
     load();
   }, [currentUser]);
 
-  // Recalcular fecha de próximo pago automáticamente cuando cambian fecha de inicio, frecuencia o cuotas
   useEffect(() => {
-    if (currentUser?.role === 'superadmin' && form.contractStartDate) {
+    if (currentUser?.role === 'superadmin' && form.contractStartDate && !editingId) {
       const installments = parseInt(form.advanceInstallments) || 1;
       const start = parseISO(form.contractStartDate);
       let next;
@@ -57,7 +58,7 @@ function UsersContent() {
       
       setForm(prev => ({ ...prev, nextPaymentDate: format(next, 'yyyy-MM-dd') }));
     }
-  }, [form.contractStartDate, form.paymentFrequency, form.advanceInstallments, currentUser?.role]);
+  }, [form.contractStartDate, form.paymentFrequency, form.advanceInstallments, currentUser?.role, editingId]);
 
   const load = async () => {
     if (!currentUser) return;
@@ -103,12 +104,11 @@ function UsersContent() {
       nextPaymentDate: isCreatingClinic ? form.nextPaymentDate : undefined,
       contractStartDate: isCreatingClinic ? form.contractStartDate : undefined,
       paymentFrequency: isCreatingClinic ? form.paymentFrequency : undefined,
-      subscriptionStatus: editingId ? (users.find(u => u.id === editingId)?.subscriptionStatus || 'active') : 'active'
+      subscriptionStatus: form.subscriptionStatus
     };
 
     await db.put('users', newUser);
 
-    // Registrar pago inicial si es nuevo consultorio
     if (isCreatingClinic && !editingId) {
       const installments = parseInt(form.advanceInstallments) || 1;
       const totalAmount = parseFloat(form.subscriptionFee) * installments;
@@ -144,7 +144,8 @@ function UsersContent() {
       nextPaymentDate: '',
       contractStartDate: new Date().toISOString().split('T')[0],
       paymentFrequency: 'monthly',
-      advanceInstallments: '1'
+      advanceInstallments: '1',
+      subscriptionStatus: 'active'
     });
   };
 
@@ -169,7 +170,8 @@ function UsersContent() {
       nextPaymentDate: u.nextPaymentDate || '',
       contractStartDate: u.contractStartDate || new Date().toISOString().split('T')[0],
       paymentFrequency: u.paymentFrequency || 'monthly',
-      advanceInstallments: '1'
+      advanceInstallments: '1',
+      subscriptionStatus: u.subscriptionStatus
     });
     setPhotoPreview(u.photo || null);
     setIsOpen(true);
@@ -190,7 +192,7 @@ function UsersContent() {
             </h2>
             <p className="text-muted-foreground mt-1">
               {isSuperAdmin 
-                ? 'Administra los accesos y suscripciones de consultorios' 
+                ? 'Administra los accesos y estados de cuenta de los consultorios' 
                 : 'Administra el personal clínico de tu consultorio'}
             </p>
           </div>
@@ -244,6 +246,26 @@ function UsersContent() {
                         <Label htmlFor="password">Contraseña</Label>
                         <Input id="password" type="password" value={form.password} onChange={e => setForm({...form, password: e.target.value})} required={isSuperAdmin} />
                       </div>
+
+                      <div className="col-span-2 space-y-2 border-2 border-primary/10 p-4 rounded-xl bg-primary/5">
+                        <Label className="text-primary font-bold flex items-center gap-2">
+                          <ShieldAlert className="w-4 h-4" /> Estado de la Cuenta
+                        </Label>
+                        <Select value={form.subscriptionStatus} onValueChange={(v: any) => setForm({...form, subscriptionStatus: v})}>
+                          <SelectTrigger className="h-11 border-primary/20 bg-white">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="active">Activa (Acceso Total)</SelectItem>
+                            <SelectItem value="suspended">Suspendida (Solo Lectura de Pago)</SelectItem>
+                            <SelectItem value="blocked">Bloqueada (Acceso Denegado)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <p className="text-[10px] text-muted-foreground italic">
+                          * El estado bloqueado impide el login. El suspendido permite login pero bloquea los módulos dentales.
+                        </p>
+                      </div>
+
                       <div className="col-span-2 border-t pt-4 mt-2">
                         <h4 className="text-sm font-bold text-primary flex items-center gap-2 mb-4">
                           <CreditCard className="w-4 h-4" /> Datos de Suscripción y Cobro
@@ -280,7 +302,7 @@ function UsersContent() {
                           </div>
                           <div className="space-y-2">
                             <Label>Próximo Pago (Calculado)</Label>
-                            <div className="h-10 px-3 py-2 border rounded-md bg-white font-bold text-primary flex items-center gap-2">
+                            <div className="h-10 px-3 py-2 border rounded-md bg-white font-bold text-primary flex items-center gap-2 text-xs">
                               <Calendar className="w-4 h-4" />
                               {form.nextPaymentDate}
                             </div>
@@ -346,7 +368,7 @@ function UsersContent() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {users.map((u) => (
             <Card key={u.id} className="border-none shadow-sm hover:shadow-md transition-all group overflow-hidden">
-               <div className={`h-1 ${u.status === 'active' ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+               <div className={cn("h-1", u.subscriptionStatus === 'active' ? 'bg-emerald-500' : u.subscriptionStatus === 'suspended' ? 'bg-amber-500' : 'bg-red-600')} />
                <CardHeader className="flex flex-row items-start gap-4 pb-4">
                  <Avatar className="w-16 h-16 rounded-xl">
                    <AvatarImage src={u.photo} />
@@ -375,10 +397,15 @@ function UsersContent() {
                </CardHeader>
                <CardContent className="space-y-4">
                  {isSuperAdmin && (
-                   <div className="bg-muted/50 p-3 rounded-lg text-[10px] space-y-1">
+                   <div className="bg-muted/50 p-3 rounded-lg text-[10px] space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span>Estado Cuenta:</span> 
+                        <Badge variant={u.subscriptionStatus === 'active' ? 'default' : u.subscriptionStatus === 'suspended' ? 'secondary' : 'destructive'} className="text-[9px] h-5">
+                          {u.subscriptionStatus === 'active' ? 'ACTIVA' : u.subscriptionStatus === 'suspended' ? 'SUSPENDIDA' : 'BLOQUEADA'}
+                        </Badge>
+                      </div>
                       <p className="flex justify-between"><span>Cobro:</span> <b className="text-primary font-bold">S/. {u.subscriptionFee?.toFixed(2)}</b></p>
                       <p className="flex justify-between"><span>Vence:</span> <b>{u.nextPaymentDate || 'N/A'}</b></p>
-                      <p className="flex justify-between"><span>Frecuencia:</span> <b>{u.paymentFrequency === 'monthly' ? 'Mensual' : 'Anual'}</b></p>
                    </div>
                  )}
                  <div className="text-xs space-y-2 text-muted-foreground">

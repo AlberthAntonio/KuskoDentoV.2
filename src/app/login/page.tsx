@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from 'react';
@@ -20,11 +21,11 @@ function LoginContent() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    const success = await login(username, password);
-    if (success) {
+    const result = await login(username, password);
+    if (result.success) {
       router.push('/dashboard');
     } else {
-      setError('Credenciales incorrectas');
+      setError(result.message || 'Credenciales incorrectas');
     }
   };
 

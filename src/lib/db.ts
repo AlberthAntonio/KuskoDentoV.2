@@ -19,12 +19,12 @@ export interface User {
   clinicId?: string; 
   lastLogin?: string;
   status?: 'active' | 'inactive';
-  // Campos de suscripción
+  // Campos de suscripción y estado de cuenta
   subscriptionFee?: number;
   nextPaymentDate?: string;
   contractStartDate?: string;
   paymentFrequency?: 'monthly' | 'yearly';
-  subscriptionStatus?: 'active' | 'pending' | 'overdue' | 'blocked';
+  subscriptionStatus: 'active' | 'suspended' | 'blocked';
 }
 
 export interface Patient {
