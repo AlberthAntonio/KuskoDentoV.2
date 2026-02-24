@@ -16,7 +16,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
-import { addMonths, addYears, format, parseISO } from 'date-fns';
+import { addMonths, format, parseISO } from 'date-fns';
 
 function UsersContent() {
   const { toast } = useToast();
@@ -49,17 +49,10 @@ function UsersContent() {
     if (currentUser?.role === 'superadmin' && form.contractStartDate && !editingId) {
       const installments = parseInt(form.advanceInstallments) || 1;
       const start = parseISO(form.contractStartDate);
-      let next;
-      
-      if (form.paymentFrequency === 'monthly') {
-        next = addMonths(start, installments);
-      } else {
-        next = addYears(start, installments);
-      }
-      
+      const next = addMonths(start, installments);
       setForm(prev => ({ ...prev, nextPaymentDate: format(next, 'yyyy-MM-dd') }));
     }
-  }, [form.contractStartDate, form.paymentFrequency, form.advanceInstallments, currentUser?.role, editingId]);
+  }, [form.contractStartDate, form.advanceInstallments, currentUser?.role, editingId]);
 
   const load = async () => {
     if (!currentUser) return;
@@ -103,7 +96,7 @@ function UsersContent() {
       subscriptionFee: isCreatingClinic ? parseFloat(form.subscriptionFee) : undefined,
       nextPaymentDate: isCreatingClinic ? form.nextPaymentDate : undefined,
       contractStartDate: isCreatingClinic ? form.contractStartDate : undefined,
-      paymentFrequency: isCreatingClinic ? form.paymentFrequency : undefined,
+      paymentFrequency: 'monthly',
       subscriptionStatus: form.subscriptionStatus
     };
 
@@ -119,7 +112,7 @@ function UsersContent() {
         clinicName: newUser.fullName || newUser.username || 'Nuevo Consultorio',
         amount: totalAmount,
         date: new Date().toISOString().split('T')[0],
-        concept: `Pago inicial: ${installments} cuota(s) (${form.paymentFrequency === 'monthly' ? 'Mensual' : 'Anual'})`
+        concept: `Pago inicial: ${installments} cuota(s) mensuales adelantadas`
       });
     }
 
@@ -169,7 +162,7 @@ function UsersContent() {
       subscriptionFee: u.subscriptionFee?.toString() || '50',
       nextPaymentDate: u.nextPaymentDate || '',
       contractStartDate: u.contractStartDate || new Date().toISOString().split('T')[0],
-      paymentFrequency: u.paymentFrequency || 'monthly',
+      paymentFrequency: 'monthly',
       advanceInstallments: '1',
       subscriptionStatus: u.subscriptionStatus
     });
@@ -181,6 +174,9 @@ function UsersContent() {
 
   const isSuperAdmin = currentUser.role === 'superadmin';
   const totalInformational = (parseFloat(form.subscriptionFee) || 0) * (parseInt(form.advanceInstallments) || 1);
+
+  // Opciones de cuotas hasta 24
+  const installmentOptions = Array.from({ length: 24 }, (_, i) => i + 1);
 
   return (
     <AppLayout>
@@ -265,30 +261,20 @@ function UsersContent() {
 
                       <div className="col-span-2 border-t pt-4 mt-2">
                         <h4 className="text-sm font-bold text-primary flex items-center gap-2 mb-4">
-                          <CreditCard className="w-4 h-4" /> Configuración de Suscripción
+                          <CreditCard className="w-4 h-4" /> Configuración de Suscripción Mensual
                         </h4>
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-4 bg-muted/30 p-4 rounded-xl">
                           <div className="space-y-2">
-                            <Label>Costo Unitario (S/.)</Label>
+                            <Label>Costo Mensual (S/.)</Label>
                             <Input type="number" step="0.01" value={form.subscriptionFee} onChange={e => setForm({...form, subscriptionFee: e.target.value})} />
                           </div>
                           <div className="space-y-2">
-                            <Label>Frecuencia</Label>
-                            <Select value={form.paymentFrequency} onValueChange={(v: any) => setForm({...form, paymentFrequency: v})}>
-                              <SelectTrigger><SelectValue /></SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="monthly">Mensual</SelectItem>
-                                <SelectItem value="yearly">Anual</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="space-y-2">
-                            <Label>Meses/Años Adelanto</Label>
+                            <Label>Meses de Adelanto</Label>
                             <Select value={form.advanceInstallments} onValueChange={(v: any) => setForm({...form, advanceInstallments: v})}>
                               <SelectTrigger><SelectValue /></SelectTrigger>
                               <SelectContent>
-                                {[1, 2, 3, 4, 5, 6, 12].map(n => (
-                                  <SelectItem key={n} value={n.toString()}>{n} cuota(s)</SelectItem>
+                                {installmentOptions.map(n => (
+                                  <SelectItem key={n} value={n.toString()}>{n} mes(es)</SelectItem>
                                 ))}
                               </SelectContent>
                             </Select>
@@ -304,10 +290,10 @@ function UsersContent() {
                               {form.nextPaymentDate ? format(parseISO(form.nextPaymentDate), 'dd/MM/yyyy') : '---'}
                             </div>
                           </div>
-                          <div className="space-y-2 flex flex-col justify-end">
-                            <div className="p-2 bg-primary text-primary-foreground rounded-lg text-center">
-                              <p className="text-[9px] uppercase font-bold opacity-80">Total a Cobrar</p>
-                              <p className="text-base font-bold">S/. {totalInformational.toFixed(2)}</p>
+                          <div className="space-y-2 col-span-2 flex flex-col justify-end">
+                            <div className="p-3 bg-primary text-primary-foreground rounded-lg text-center">
+                              <p className="text-[10px] uppercase font-bold opacity-80">Monto total a pagar por adelanto</p>
+                              <p className="text-lg font-bold">S/. {totalInformational.toFixed(2)}</p>
                             </div>
                           </div>
                         </div>
@@ -354,7 +340,7 @@ function UsersContent() {
 
                 <DialogFooter className="pt-6">
                   <Button type="submit" className="w-full h-12 text-lg">
-                    {editingId ? 'Actualizar Registro' : 'Registrar y Generar Primer Cobro'}
+                    {editingId ? 'Actualizar Registro' : 'Registrar Consultorio y Generar Cobro'}
                   </Button>
                 </DialogFooter>
               </form>
@@ -402,7 +388,7 @@ function UsersContent() {
                         </Badge>
                       </div>
                       <p className="flex justify-between"><span>Mensualidad:</span> <b className="text-primary font-bold">S/. {u.subscriptionFee?.toFixed(2)}</b></p>
-                      <p className="flex justify-between"><span>Vencimiento:</span> <b className="text-red-600">{u.nextPaymentDate ? format(parseISO(u.nextPaymentDate), 'dd/MM/yyyy') : 'Pendiente'}</b></p>
+                      <p className="flex justify-between"><span>Próximo Pago:</span> <b className="text-red-600">{u.nextPaymentDate ? format(parseISO(u.nextPaymentDate), 'dd/MM/yyyy') : 'Pendiente'}</b></p>
                    </div>
                  )}
                  <div className="text-xs space-y-2 text-muted-foreground">

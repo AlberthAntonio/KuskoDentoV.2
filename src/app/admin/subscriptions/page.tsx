@@ -52,7 +52,7 @@ function SubscriptionsContent() {
       <div className="space-y-8">
         <div>
           <h2 className="text-3xl font-bold text-primary">Estado de Suscripciones</h2>
-          <p className="text-muted-foreground mt-2">Visión general del estado de acceso y salud de la red de consultorios</p>
+          <p className="text-muted-foreground mt-2">Visión general del estado de acceso y salud de la red (DD/MM/YYYY)</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -95,7 +95,6 @@ function SubscriptionsContent() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Consultorio</TableHead>
-                  <TableHead>Plan Asignado</TableHead>
                   <TableHead>Vencimiento</TableHead>
                   <TableHead>Estado</TableHead>
                 </TableRow>
@@ -107,13 +106,7 @@ function SubscriptionsContent() {
                     <TableRow key={c.id}>
                       <TableCell>
                         <p className="font-bold text-sm text-slate-900">{c.fullName || c.username}</p>
-                        <p className="text-[10px] text-muted-foreground uppercase">{c.dni || 'Sin DNI'}</p>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary" className="text-[10px] font-bold">
-                          {c.paymentFrequency === 'yearly' ? 'ANUAL' : 'MENSUAL'}
-                        </Badge>
-                        <span className="ml-2 text-xs font-medium text-slate-500">S/. {c.subscriptionFee}</span>
+                        <p className="text-[10px] text-muted-foreground uppercase">S/. {c.subscriptionFee} mensual</p>
                       </TableCell>
                       <TableCell className="text-xs font-semibold text-slate-700">
                         {c.nextPaymentDate ? format(parseISO(c.nextPaymentDate), "dd/MM/yyyy") : 'No definido'}

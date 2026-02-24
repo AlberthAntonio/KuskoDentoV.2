@@ -14,7 +14,7 @@ import { Search, CreditCard, Calendar, Clock, CheckCircle2, AlertTriangle, Landm
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { format, isAfter, parseISO, addDays, addMonths, addYears } from 'date-fns';
+import { format, isAfter, parseISO, addDays, addMonths } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 
@@ -38,13 +38,7 @@ function BillingContent() {
     if (selectedClinic && installments) {
       const currentExpiry = selectedClinic.nextPaymentDate ? parseISO(selectedClinic.nextPaymentDate) : new Date();
       const num = parseInt(installments) || 1;
-      let calculatedNext;
-      
-      if (selectedClinic.paymentFrequency === 'yearly') {
-        calculatedNext = addYears(currentExpiry, num);
-      } else {
-        calculatedNext = addMonths(currentExpiry, num);
-      }
+      const calculatedNext = addMonths(currentExpiry, num);
       
       setNextDate(format(calculatedNext, 'yyyy-MM-dd'));
       setPayAmount(((selectedClinic.subscriptionFee || 0) * num).toString());
@@ -94,7 +88,7 @@ function BillingContent() {
       clinicName: selectedClinic.fullName || selectedClinic.username || 'Clínica',
       amount: parseFloat(payAmount),
       date: new Date().toISOString().split('T')[0],
-      concept: `Renovación: ${installments} cuota(s). Próximo vencimiento: ${format(parseISO(nextDate), 'dd/MM/yyyy')}`
+      concept: `Renovación: ${installments} cuota(s) mensuales. Próximo vencimiento: ${format(parseISO(nextDate), 'dd/MM/yyyy')}`
     };
 
     await db.put('subscription_payments', payment);
@@ -102,7 +96,7 @@ function BillingContent() {
     const updatedClinic: User = {
       ...selectedClinic,
       nextPaymentDate: nextDate,
-      subscriptionStatus: 'active' // Al pagar se reactiva automáticamente
+      subscriptionStatus: 'active'
     };
     await db.put('users', updatedClinic);
 
@@ -128,7 +122,7 @@ function BillingContent() {
         <div className="flex justify-between items-start">
           <div>
             <h2 className="text-3xl font-bold text-primary">Gestión de Pagos y Accesos</h2>
-            <p className="text-muted-foreground mt-2">Control financiero centralizado y administración de estados de servicio</p>
+            <p className="text-muted-foreground mt-2">Control financiero centralizado (Formato Día/Mes/Año)</p>
           </div>
           <div className="bg-primary/10 px-6 py-3 rounded-2xl border border-primary/20 flex items-center gap-4">
             <ReceiptText className="w-6 h-6 text-primary" />
@@ -139,35 +133,12 @@ function BillingContent() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <Card className="border-none shadow-sm bg-white overflow-hidden">
-            <div className="h-1 bg-primary" />
-            <CardHeader className="pb-2"><CardTitle className="text-[10px] uppercase font-bold text-muted-foreground">Total Consultorios</CardTitle></CardHeader>
-            <CardContent><div className="text-3xl font-bold">{clinics.length}</div></CardContent>
-          </Card>
-          <Card className="border-none shadow-sm bg-emerald-50 overflow-hidden">
-            <div className="h-1 bg-emerald-500" />
-            <CardHeader className="pb-2"><CardTitle className="text-[10px] uppercase font-bold text-emerald-600">Al Día</CardTitle></CardHeader>
-            <CardContent><div className="text-3xl font-bold text-emerald-600">{clinics.filter(c => getStatus(c) === 'active').length}</div></CardContent>
-          </Card>
-          <Card className="border-none shadow-sm bg-amber-50 overflow-hidden">
-            <div className="h-1 bg-amber-500" />
-            <CardHeader className="pb-2"><CardTitle className="text-[10px] uppercase font-bold text-amber-600">Suspendidos</CardTitle></CardHeader>
-            <CardContent><div className="text-3xl font-bold text-amber-600">{clinics.filter(c => getStatus(c) === 'suspended').length}</div></CardContent>
-          </Card>
-          <Card className="border-none shadow-sm bg-red-50 overflow-hidden">
-            <div className="h-1 bg-red-500" />
-            <CardHeader className="pb-2"><CardTitle className="text-[10px] uppercase font-bold text-red-600">Bloqueados</CardTitle></CardHeader>
-            <CardContent><div className="text-3xl font-bold text-red-600">{clinics.filter(c => getStatus(c) === 'blocked').length}</div></CardContent>
-          </Card>
-        </div>
-
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <Card className="lg:col-span-2 border-none shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between border-b pb-6 mb-6">
               <div>
                 <CardTitle className="text-xl">Panel de Control Financiero</CardTitle>
-                <CardDescription>Cobros, bloqueos y reactivación de cuentas</CardDescription>
+                <CardDescription>Cobros y reactivación de cuentas</CardDescription>
               </div>
               <div className="relative w-72">
                 <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
@@ -179,9 +150,9 @@ function BillingContent() {
                 <TableHeader>
                   <TableRow className="hover:bg-transparent">
                     <TableHead>Consultorio</TableHead>
-                    <TableHead>Próximo Pago</TableHead>
-                    <TableHead>Estado Actual</TableHead>
-                    <TableHead className="text-right">Acciones de Gestión</TableHead>
+                    <TableHead>Vencimiento</TableHead>
+                    <TableHead>Estado</TableHead>
+                    <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -191,7 +162,7 @@ function BillingContent() {
                       <TableRow key={c.id} className="group transition-colors">
                         <TableCell>
                           <p className="font-bold text-sm text-slate-900">{c.fullName || c.username}</p>
-                          <p className="text-[10px] text-muted-foreground uppercase font-medium">{c.paymentFrequency === 'yearly' ? 'Plan Anual' : 'Plan Mensual'} · S/. {c.subscriptionFee}</p>
+                          <p className="text-[10px] text-muted-foreground uppercase font-medium">Costo: S/. {c.subscriptionFee}</p>
                         </TableCell>
                         <TableCell className="text-xs font-semibold">
                           {c.nextPaymentDate ? format(parseISO(c.nextPaymentDate), "dd/MM/yyyy") : 'Pendiente'}
@@ -258,14 +229,13 @@ function BillingContent() {
           <Card className="border-none shadow-sm">
             <CardHeader className="border-b pb-6 mb-6">
               <CardTitle className="text-lg flex items-center gap-2"><History className="w-5 h-5 text-primary" /> Historial de Cobros</CardTitle>
-              <CardDescription>Últimas transacciones verificadas</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 scrollbar-hide">
                 {history.map(h => (
                   <div key={h.id} className="p-4 border rounded-2xl bg-slate-50 flex items-start justify-between hover:bg-white transition-all shadow-sm border-slate-200 group">
                     <div className="flex gap-3">
-                      <div className="p-2.5 bg-white rounded-xl text-emerald-600 border border-emerald-100 group-hover:scale-110 transition-transform">
+                      <div className="p-2 bg-white rounded-xl text-emerald-600 border border-emerald-100">
                         <CheckCircle2 className="w-4 h-4" />
                       </div>
                       <div className="min-w-0">
@@ -279,12 +249,6 @@ function BillingContent() {
                     </div>
                   </div>
                 ))}
-                {history.length === 0 && (
-                  <div className="py-24 text-center opacity-30 flex flex-col items-center gap-3">
-                    <Banknote className="w-12 h-12" />
-                    <p className="text-xs font-medium">Sin registros financieros</p>
-                  </div>
-                )}
               </div>
             </CardContent>
           </Card>
@@ -295,7 +259,7 @@ function BillingContent() {
         <DialogContent className="sm:max-w-md rounded-3xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-xl font-bold">
-              <Landmark className="w-6 h-6 text-primary" /> Registrar Cobro
+              <Landmark className="w-6 h-6 text-primary" /> Registrar Cobro Mensual
             </DialogTitle>
           </DialogHeader>
           {selectedClinic && (
@@ -303,16 +267,21 @@ function BillingContent() {
               <div className="bg-primary/5 p-5 rounded-2xl border border-primary/10">
                 <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest mb-1">Consultorio</p>
                 <p className="font-bold text-lg text-primary">{selectedClinic.fullName || selectedClinic.username}</p>
-                <div className="flex justify-between mt-3 border-t pt-3 border-primary/10">
-                  <span className="text-xs font-medium text-slate-600">Plan Actual:</span>
-                  <span className="text-xs font-bold uppercase">{selectedClinic.paymentFrequency === 'monthly' ? 'Mensual' : 'Anual'}</span>
-                </div>
               </div>
               
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label className="text-xs font-bold">Cuotas a Pagar</Label>
-                  <Input type="number" min="1" value={installments} onChange={e => setInstallments(e.target.value)} className="rounded-xl h-11" />
+                  <Label className="text-xs font-bold">Meses a Pagar</Label>
+                  <Select value={installments} onValueChange={setInstallments}>
+                    <SelectTrigger className="h-11 rounded-xl">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 24 }, (_, i) => i + 1).map(n => (
+                        <SelectItem key={n} value={n.toString()}>{n} mes(es)</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2">
                   <Label className="text-xs font-bold">Monto Total (S/.)</Label>

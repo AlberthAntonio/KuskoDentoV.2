@@ -66,7 +66,6 @@ function AppointmentsContent() {
     const allT = await db.getAll<Treatment>('treatments');
     const allU = await db.getAll<User>('users');
     
-    // Filtrar por consultorio
     const myPatients = allP.filter(p => p.clinicId === clinicId);
     const myTreatments = allT.filter(t => t.clinicId === clinicId);
     const myUsers = allU.filter(u => u.id === clinicId || u.clinicId === clinicId);
@@ -116,7 +115,6 @@ function AppointmentsContent() {
     e.preventDefault();
     if (!clinicId) return;
 
-    // Validar duplicidad de hora para el mismo doctor
     const conflict = rawAppointments.find(a => 
       a.doctorId === form.doctorId && 
       a.date === form.date && 
@@ -231,7 +229,7 @@ function AppointmentsContent() {
         <div className="flex justify-between items-center">
           <div>
             <h2 className="text-3xl font-bold text-primary">Agenda de Citas</h2>
-            <p className="text-muted-foreground mt-1">Gestión de turnos y presupuestos</p>
+            <p className="text-muted-foreground mt-1">Gestión de turnos y presupuestos (DD/MM/YYYY)</p>
           </div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => { setFilterType('all'); setSpecificDate(''); }} className={cn(filterType === 'all' && "bg-primary/10")}>
@@ -392,9 +390,6 @@ function AppointmentsContent() {
                         setFilterType('specific');
                       }} 
                     />
-                    <Button size="icon" variant="outline" className="h-9 w-9 shrink-0">
-                      <CalendarSearch className="w-4 h-4" />
-                    </Button>
                   </div>
                 </div>
              </CardContent>
@@ -406,7 +401,7 @@ function AppointmentsContent() {
                   {filterType === 'all' ? 'Todas las citas' : 
                    filterType === 'today' ? 'Citas de hoy' : 
                    filterType === 'week' ? 'Citas de la semana' : 
-                   `Citas del ${specificDate}`}
+                   `Citas del ${specificDate ? format(parseISO(specificDate), 'dd/MM/yyyy') : ''}`}
                 </Badge>
                 <span className="text-xs text-muted-foreground">{appointments.length} resultados encontrados</span>
              </div>
@@ -428,7 +423,7 @@ function AppointmentsContent() {
                        <TableCell>
                          <div className="flex flex-col">
                            <span className="font-bold flex items-center gap-1"><Clock className="w-3 h-3" /> {a.time}</span>
-                           <span className="text-[10px] text-muted-foreground">{a.date}</span>
+                           <span className="text-[10px] text-muted-foreground">{format(parseISO(a.date), 'dd/MM/yyyy')}</span>
                          </div>
                        </TableCell>
                        <TableCell>
@@ -470,7 +465,6 @@ function AppointmentsContent() {
         </div>
       </div>
 
-      {/* Modal de eliminación con contraseña */}
       <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
