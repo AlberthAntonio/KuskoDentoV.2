@@ -8,7 +8,7 @@ import { db, User, UserRole } from '@/lib/db';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
-import { Shield, Trash2, UserPlus, Camera, MapPin, User as UserIcon, Building2, Stethoscope, Briefcase, Clock, Circle, Edit2 } from 'lucide-react';
+import { Shield, Trash2, UserPlus, Camera, MapPin, User as UserIcon, Building2, Stethoscope, Briefcase, Clock, Circle, Edit2, CreditCard, Calendar } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -30,7 +30,11 @@ function UsersContent() {
     dni: '', 
     address: '', 
     colegiatura: '',
-    role: 'doctor' as UserRole
+    role: 'doctor' as UserRole,
+    subscriptionFee: '0',
+    nextPaymentDate: '',
+    contractStartDate: new Date().toISOString().split('T')[0],
+    paymentFrequency: 'monthly' as 'monthly' | 'yearly'
   });
 
   useEffect(() => {
@@ -75,7 +79,13 @@ function UsersContent() {
       photo: photoPreview || undefined,
       role: isCreatingClinic ? 'clinic' : form.role,
       clinicId: currentUser.role === 'clinic' ? currentUser.id : undefined,
-      status: editingId ? (users.find(u => u.id === editingId)?.status || 'inactive') : 'inactive'
+      status: editingId ? (users.find(u => u.id === editingId)?.status || 'inactive') : 'inactive',
+      // Subscription fields
+      subscriptionFee: isCreatingClinic ? parseFloat(form.subscriptionFee) : undefined,
+      nextPaymentDate: isCreatingClinic ? form.nextPaymentDate : undefined,
+      contractStartDate: isCreatingClinic ? form.contractStartDate : undefined,
+      paymentFrequency: isCreatingClinic ? form.paymentFrequency : undefined,
+      subscriptionStatus: editingId ? (users.find(u => u.id === editingId)?.subscriptionStatus || 'active') : 'active'
     };
 
     await db.put('users', newUser);
@@ -95,7 +105,11 @@ function UsersContent() {
       dni: '', 
       address: '', 
       colegiatura: '',
-      role: currentUser?.role === 'clinic' ? 'doctor' : 'clinic'
+      role: currentUser?.role === 'clinic' ? 'doctor' : 'clinic',
+      subscriptionFee: '0',
+      nextPaymentDate: '',
+      contractStartDate: new Date().toISOString().split('T')[0],
+      paymentFrequency: 'monthly'
     });
   };
 
@@ -115,7 +129,11 @@ function UsersContent() {
       dni: u.dni || '', 
       address: u.address || '', 
       colegiatura: u.colegiatura || '',
-      role: u.role
+      role: u.role,
+      subscriptionFee: u.subscriptionFee?.toString() || '0',
+      nextPaymentDate: u.nextPaymentDate || '',
+      contractStartDate: u.contractStartDate || new Date().toISOString().split('T')[0],
+      paymentFrequency: u.paymentFrequency || 'monthly'
     });
     setPhotoPreview(u.photo || null);
     setIsOpen(true);
@@ -135,8 +153,8 @@ function UsersContent() {
             </h2>
             <p className="text-muted-foreground mt-1">
               {isSuperAdmin 
-                ? 'Administra los accesos de consultorios dentales' 
-                : 'Administra el personal clínico (Doctores, Asistentes, Técnicos)'}
+                ? 'Administra los accesos y suscripciones de consultorios' 
+                : 'Administra el personal clínico de tu consultorio'}
             </p>
           </div>
           <Dialog open={isOpen} onOpenChange={(val) => {
@@ -149,14 +167,14 @@ function UsersContent() {
                 {isSuperAdmin ? 'Nuevo Consultorio' : 'Nuevo Personal'}
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+            <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>
                   {editingId ? 'Editar Registro' : isSuperAdmin ? 'Registrar Nuevo Consultorio' : 'Registrar Nuevo Personal'}
                 </DialogTitle>
               </DialogHeader>
-              <form onSubmit={handleSave} className="space-y-4 py-4">
-                <div className="flex justify-center mb-6">
+              <form onSubmit={handleSave} className="space-y-6 py-4">
+                <div className="flex justify-center">
                   <div className="relative">
                     <Avatar className="w-24 h-24 border-2 border-primary/20">
                       <AvatarImage src={photoPreview || ''} />
@@ -179,6 +197,48 @@ function UsersContent() {
                     <Input id="fullName" value={form.fullName} onChange={e => setForm({...form, fullName: e.target.value})} required placeholder={isSuperAdmin ? "Ej: Consultorio Dental Cusco" : "Ej: Dr. Juan Pérez"} />
                   </div>
                   
+                  {isSuperAdmin && (
+                    <>
+                      <div className="space-y-2">
+                        <Label htmlFor="username">Usuario (Login)</Label>
+                        <Input id="username" value={form.username} onChange={e => setForm({...form, username: e.target.value})} required={isSuperAdmin} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="password">Contraseña</Label>
+                        <Input id="password" type="password" value={form.password} onChange={e => setForm({...form, password: e.target.value})} required={isSuperAdmin} />
+                      </div>
+                      <div className="col-span-2 border-t pt-4 mt-2">
+                        <h4 className="text-sm font-bold text-primary flex items-center gap-2 mb-4">
+                          <CreditCard className="w-4 h-4" /> Datos de Suscripción y Cobro
+                        </h4>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label>Monto de Cobro (S/.)</Label>
+                            <Input type="number" step="0.01" value={form.subscriptionFee} onChange={e => setForm({...form, subscriptionFee: e.target.value})} />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Frecuencia</Label>
+                            <Select value={form.paymentFrequency} onValueChange={(v: any) => setForm({...form, paymentFrequency: v})}>
+                              <SelectTrigger><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="monthly">Mensual</SelectItem>
+                                <SelectItem value="yearly">Anual</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Inicio de Contrato</Label>
+                            <Input type="date" value={form.contractStartDate} onChange={e => setForm({...form, contractStartDate: e.target.value})} />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Próximo Pago</Label>
+                            <Input type="date" value={form.nextPaymentDate} onChange={e => setForm({...form, nextPaymentDate: e.target.value})} required />
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  )}
+
                   {!isSuperAdmin && (
                     <div className="space-y-2 col-span-2">
                       <Label htmlFor="role">Tipo de Personal</Label>
@@ -193,19 +253,6 @@ function UsersContent() {
                         </SelectContent>
                       </Select>
                     </div>
-                  )}
-
-                  {isSuperAdmin && (
-                    <>
-                      <div className="space-y-2">
-                        <Label htmlFor="username">Usuario (Login)</Label>
-                        <Input id="username" value={form.username} onChange={e => setForm({...form, username: e.target.value})} required={isSuperAdmin} />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="password">Contraseña</Label>
-                        <Input id="password" type="password" value={form.password} onChange={e => setForm({...form, password: e.target.value})} required={isSuperAdmin} />
-                      </div>
-                    </>
                   )}
                   
                   <div className="space-y-2">
@@ -256,7 +303,7 @@ function UsersContent() {
                     {isSuperAdmin && (
                       <div className="flex items-center gap-1">
                         <Circle className={cn("w-2 h-2 fill-current", u.status === 'active' ? 'text-emerald-500' : 'text-slate-300')} />
-                        <span className="text-[10px] font-bold text-muted-foreground">{u.status === 'active' ? 'Activo' : 'Desconectado'}</span>
+                        <span className="text-[10px] font-bold text-muted-foreground">{u.status === 'active' ? 'Activo' : 'Offline'}</span>
                       </div>
                     )}
                    </div>
@@ -269,11 +316,18 @@ function UsersContent() {
                    </CardDescription>
                  </div>
                </CardHeader>
-               <CardContent className="space-y-3">
+               <CardContent className="space-y-4">
+                 {isSuperAdmin && (
+                   <div className="bg-muted/50 p-3 rounded-lg text-[10px] space-y-1">
+                      <p className="flex justify-between"><span>Cobro:</span> <b className="text-primary font-bold">S/. {u.subscriptionFee?.toFixed(2)}</b></p>
+                      <p className="flex justify-between"><span>Vence:</span> <b>{u.nextPaymentDate || 'N/A'}</b></p>
+                      <p className="flex justify-between"><span>Frecuencia:</span> <b>{u.paymentFrequency === 'monthly' ? 'Mensual' : 'Anual'}</b></p>
+                   </div>
+                 )}
                  <div className="text-xs space-y-2 text-muted-foreground">
-                    <p className="flex items-center gap-2"><MapPin className="w-3 h-3" /> {u.address || 'Sin dirección'}</p>
+                    <p className="flex items-center gap-2 truncate"><MapPin className="w-3 h-3" /> {u.address || 'Sin dirección'}</p>
                     {u.lastLogin && isSuperAdmin && (
-                      <p className="flex items-center gap-2"><Clock className="w-3 h-3" /> Último acceso: {new Date(u.lastLogin).toLocaleString('es-PE')}</p>
+                      <p className="flex items-center gap-2"><Clock className="w-3 h-3" /> Login: {new Date(u.lastLogin).toLocaleString('es-PE')}</p>
                     )}
                  </div>
                  <div className="flex gap-2 pt-2">
