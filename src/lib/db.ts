@@ -8,8 +8,8 @@ export type UserRole = 'superadmin' | 'clinic' | 'doctor' | 'assistant' | 'techn
 
 export interface User {
   id: string;
-  username?: string; // Opcional para personal sin login
-  password?: string; // Opcional para personal sin login
+  username?: string; 
+  password?: string; 
   role: UserRole;
   fullName?: string;
   dni?: string;

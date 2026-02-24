@@ -46,7 +46,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       icon: Landmark, 
       label: 'Pagos', 
       href: '/payments', 
-      show: isClinic || user.role === 'doctor' 
+      show: !isSuperAdmin 
     },
     { 
       icon: Activity, 
