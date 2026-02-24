@@ -10,12 +10,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, CreditCard, Calendar, Clock, CheckCircle2, AlertTriangle, Landmark, Plus, History, ReceiptText, Banknote, ShieldAlert, ShieldCheck, Ban, RefreshCcw } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { Search, Landmark, History, ReceiptText, ShieldCheck, ShieldAlert, Ban, RefreshCcw } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { format, isAfter, parseISO, addDays, addMonths } from 'date-fns';
-import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 
 function BillingContent() {
@@ -52,10 +52,9 @@ function BillingContent() {
     setHistory(allHistory.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
   };
 
-  const getStatus = (clinic: User) => {
+  const getCalculatedStatus = (clinic: User) => {
     if (clinic.subscriptionStatus === 'blocked') return 'blocked';
-    if (clinic.subscriptionStatus === 'suspended') return 'suspended';
-    if (!clinic.nextPaymentDate) return 'pending';
+    if (!clinic.nextPaymentDate) return 'active';
     
     const next = parseISO(clinic.nextPaymentDate);
     const today = new Date();
@@ -96,7 +95,7 @@ function BillingContent() {
     const updatedClinic: User = {
       ...selectedClinic,
       nextPaymentDate: nextDate,
-      subscriptionStatus: 'active'
+      subscriptionStatus: 'active' // Al pagar, se activa automáticamente
     };
     await db.put('users', updatedClinic);
 
@@ -122,7 +121,7 @@ function BillingContent() {
         <div className="flex justify-between items-start">
           <div>
             <h2 className="text-3xl font-bold text-primary">Gestión de Pagos y Accesos</h2>
-            <p className="text-muted-foreground mt-2">Control financiero centralizado (Formato Día/Mes/Año)</p>
+            <p className="text-muted-foreground mt-2">Control financiero centralizado (Día/Mes/Año)</p>
           </div>
           <div className="bg-primary/10 px-6 py-3 rounded-2xl border border-primary/20 flex items-center gap-4">
             <ReceiptText className="w-6 h-6 text-primary" />
@@ -138,7 +137,7 @@ function BillingContent() {
             <CardHeader className="flex flex-row items-center justify-between border-b pb-6 mb-6">
               <div>
                 <CardTitle className="text-xl">Panel de Control Financiero</CardTitle>
-                <CardDescription>Cobros y reactivación de cuentas</CardDescription>
+                <CardDescription>Cobros y reactivación automática</CardDescription>
               </div>
               <div className="relative w-72">
                 <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
@@ -151,13 +150,13 @@ function BillingContent() {
                   <TableRow className="hover:bg-transparent">
                     <TableHead>Consultorio</TableHead>
                     <TableHead>Vencimiento</TableHead>
-                    <TableHead>Estado</TableHead>
+                    <TableHead>Estado Actual</TableHead>
                     <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredClinics.map(c => {
-                    const status = getStatus(c);
+                    const status = getCalculatedStatus(c);
                     return (
                       <TableRow key={c.id} className="group transition-colors">
                         <TableCell>
@@ -183,7 +182,7 @@ function BillingContent() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-1">
-                            <Button variant="outline" size="sm" className="h-8 w-8 p-0" title="Cobrar" onClick={() => {
+                            <Button variant="outline" size="sm" className="h-8 w-8 p-0" title="Registrar Cobro" onClick={() => {
                               setSelectedClinic(c);
                               setIsPayOpen(true);
                             }}>
@@ -193,7 +192,7 @@ function BillingContent() {
                               variant="outline" 
                               size="sm" 
                               className={cn("h-8 w-8 p-0", c.subscriptionStatus === 'active' && "bg-emerald-50 text-emerald-600 border-emerald-200")} 
-                              title="Activar"
+                              title="Activar Manual"
                               onClick={() => handleStatusChange(c.id, 'active')}
                             >
                               <ShieldCheck className="w-3.5 h-3.5" />
@@ -202,7 +201,7 @@ function BillingContent() {
                               variant="outline" 
                               size="sm" 
                               className={cn("h-8 w-8 p-0", c.subscriptionStatus === 'suspended' && "bg-orange-50 text-orange-600 border-orange-200")} 
-                              title="Suspender"
+                              title="Suspender Manual"
                               onClick={() => handleStatusChange(c.id, 'suspended')}
                             >
                               <ShieldAlert className="w-3.5 h-3.5" />
@@ -211,7 +210,7 @@ function BillingContent() {
                               variant="outline" 
                               size="sm" 
                               className={cn("h-8 w-8 p-0", c.subscriptionStatus === 'blocked' && "bg-red-50 text-red-600 border-red-200")} 
-                              title="Bloquear"
+                              title="Bloquear Acceso"
                               onClick={() => handleStatusChange(c.id, 'blocked')}
                             >
                               <Ban className="w-3.5 h-3.5" />
@@ -236,7 +235,7 @@ function BillingContent() {
                   <div key={h.id} className="p-4 border rounded-2xl bg-slate-50 flex items-start justify-between hover:bg-white transition-all shadow-sm border-slate-200 group">
                     <div className="flex gap-3">
                       <div className="p-2 bg-white rounded-xl text-emerald-600 border border-emerald-100">
-                        <CheckCircle2 className="w-4 h-4" />
+                        <ReceiptText className="w-4 h-4" />
                       </div>
                       <div className="min-w-0">
                         <p className="font-bold text-xs truncate text-slate-900">{h.clinicName}</p>
@@ -259,7 +258,7 @@ function BillingContent() {
         <DialogContent className="sm:max-w-md rounded-3xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-xl font-bold">
-              <Landmark className="w-6 h-6 text-primary" /> Registrar Cobro Mensual
+              <Landmark className="w-6 h-6 text-primary" /> Registrar Pago de Cuotas
             </DialogTitle>
           </DialogHeader>
           {selectedClinic && (
@@ -271,7 +270,7 @@ function BillingContent() {
               
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label className="text-xs font-bold">Meses a Pagar</Label>
+                  <Label className="text-xs font-bold">Meses a Adelantar</Label>
                   <Select value={installments} onValueChange={setInstallments}>
                     <SelectTrigger className="h-11 rounded-xl">
                       <SelectValue />
@@ -301,7 +300,7 @@ function BillingContent() {
 
               <DialogFooter className="pt-2">
                 <Button type="submit" className="w-full h-12 text-lg font-bold rounded-2xl shadow-xl shadow-primary/20">
-                  Confirmar Cobro y Activar
+                  Confirmar Pago y Activar
                 </Button>
               </DialogFooter>
             </form>

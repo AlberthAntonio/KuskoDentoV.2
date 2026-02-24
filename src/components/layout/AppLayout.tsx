@@ -4,11 +4,12 @@
 import React from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { SidebarProvider, Sidebar, SidebarContent, SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarTrigger, SidebarInset } from '@/components/ui/sidebar';
-import { Users, UserSquare2, Stethoscope, Landmark, Activity, Calendar, Database, LogOut, LayoutDashboard, ShieldCheck, BarChart3, CreditCard, AlertTriangle, QrCode, Building2, ShieldAlert, ReceiptText, Banknote } from 'lucide-react';
+import { Users, UserSquare2, Stethoscope, Landmark, Activity, Calendar, Database, LogOut, LayoutDashboard, ShieldCheck, BarChart3, CreditCard, AlertTriangle, QrCode, Building2, ShieldAlert, Banknote } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { format, isAfter, parseISO, addDays } from 'date-fns';
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
@@ -19,80 +20,41 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const isSuperAdmin = user.role === 'superadmin';
   const isClinic = user.role === 'clinic';
   
-  // LÓGICA DE ESTADOS DE CUENTA
-  const isSuspended = user.subscriptionStatus === 'suspended';
-  const isBlocked = user.subscriptionStatus === 'blocked';
+  // LÓGICA AUTOMÁTICA DE ESTADOS
+  const getCalculatedStatus = () => {
+    if (user.subscriptionStatus === 'blocked') return 'blocked';
+    if (!user.nextPaymentDate) return 'active';
+    
+    const next = parseISO(user.nextPaymentDate);
+    const today = new Date();
+    
+    // Si pasaron más de 10 días del vencimiento -> Suspendido
+    if (isAfter(today, addDays(next, 10))) return 'suspended';
+    // Si ya venció pero está en los 10 días de gracia -> Overdue (Activo con aviso)
+    if (isAfter(today, next)) return 'overdue';
+    
+    return 'active';
+  };
+
+  const currentStatus = getCalculatedStatus();
+  const isSuspended = currentStatus === 'suspended';
+  const isBlocked = currentStatus === 'blocked';
+  const isOverdue = currentStatus === 'overdue';
 
   const menuItems = [
-    { 
-      icon: LayoutDashboard, 
-      label: 'Panel Principal', 
-      href: '/dashboard', 
-      show: true 
-    },
-    { 
-      icon: BarChart3, 
-      label: 'Reportes', 
-      href: '/admin/reports', 
-      show: isSuperAdmin 
-    },
-    { 
-      icon: CreditCard, 
-      label: 'Suscripciones', 
-      href: '/admin/subscriptions', 
-      show: isSuperAdmin 
-    },
-    { 
-      icon: Banknote, 
-      label: 'Pagos', 
-      href: '/admin/billing', 
-      show: isSuperAdmin 
-    },
-    { 
-      icon: isSuperAdmin ? ShieldCheck : Users, 
-      label: isSuperAdmin ? 'Consultorios' : 'Personal', 
-      href: '/admin/users', 
-      show: (isSuperAdmin || isClinic) && !isSuspended 
-    },
-    { 
-      icon: UserSquare2, 
-      label: 'Pacientes', 
-      href: '/patients', 
-      show: !isSuperAdmin && !isSuspended 
-    },
-    { 
-      icon: Stethoscope, 
-      label: 'Tratamientos', 
-      href: '/treatments', 
-      show: !isSuperAdmin && !isSuspended 
-    },
-    { 
-      icon: Landmark, 
-      label: 'Pagos Pacientes', 
-      href: '/payments', 
-      show: !isSuperAdmin && !isSuspended 
-    },
-    { 
-      icon: Activity, 
-      label: 'Odontograma', 
-      href: '/odontogram', 
-      show: !isSuperAdmin && !isSuspended 
-    },
-    { 
-      icon: Calendar, 
-      label: 'Citas', 
-      href: '/appointments', 
-      show: !isSuperAdmin && !isSuspended 
-    },
-    { 
-      icon: Database, 
-      label: 'Copia de Seguridad', 
-      href: '/backups', 
-      show: (isSuperAdmin || isClinic) && !isSuspended 
-    },
+    { icon: LayoutDashboard, label: 'Panel Principal', href: '/dashboard', show: true },
+    { icon: BarChart3, label: 'Reportes', href: '/admin/reports', show: isSuperAdmin },
+    { icon: CreditCard, label: 'Suscripciones', href: '/admin/subscriptions', show: isSuperAdmin },
+    { icon: Banknote, label: 'Pagos', href: '/admin/billing', show: isSuperAdmin },
+    { icon: isSuperAdmin ? ShieldCheck : Users, label: isSuperAdmin ? 'Consultorios' : 'Personal', href: '/admin/users', show: (isSuperAdmin || isClinic) && !isSuspended },
+    { icon: UserSquare2, label: 'Pacientes', href: '/patients', show: !isSuperAdmin && !isSuspended },
+    { icon: Stethoscope, label: 'Tratamientos', href: '/treatments', show: !isSuperAdmin && !isSuspended },
+    { icon: Landmark, label: 'Pagos Pacientes', href: '/payments', show: !isSuperAdmin && !isSuspended },
+    { icon: Activity, label: 'Odontograma', href: '/odontogram', show: !isSuperAdmin && !isSuspended },
+    { icon: Calendar, label: 'Citas', href: '/appointments', show: !isSuperAdmin && !isSuspended },
+    { icon: Database, label: 'Copia de Seguridad', href: '/backups', show: (isSuperAdmin || isClinic) && !isSuspended },
   ];
 
-  // PANTALLA DE BLOQUEO TOTAL
   if (isBlocked && !isSuperAdmin) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center p-6">
@@ -139,9 +101,20 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           <div className="mt-auto p-6 border-t">
             <div className="mb-4 px-2">
               <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Estado de Cuenta</p>
-              <Badge variant={user.subscriptionStatus === 'active' ? 'default' : 'destructive'} className="w-full justify-center py-1">
-                {user.subscriptionStatus === 'active' ? 'ACTIVA' : user.subscriptionStatus === 'suspended' ? 'SUSPENDIDA' : 'BLOQUEADA'}
+              <Badge 
+                variant={currentStatus === 'active' ? 'default' : 'destructive'} 
+                className={cn(
+                  "w-full justify-center py-1",
+                  isOverdue && "bg-amber-500 hover:bg-amber-600"
+                )}
+              >
+                {isBlocked ? 'BLOQUEADA' : isSuspended ? 'SUSPENDIDA' : isOverdue ? 'MORA' : 'ACTIVA'}
               </Badge>
+              {user.nextPaymentDate && (
+                <p className="text-[9px] text-center mt-2 text-muted-foreground font-bold">
+                  Vence: {format(parseISO(user.nextPaymentDate), 'dd/MM/yyyy')}
+                </p>
+              )}
             </div>
             <button 
               onClick={logout}
@@ -156,10 +129,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
             <SidebarTrigger />
             <div className="flex-1 flex justify-center">
-              {isSuspended && !isSuperAdmin && (
-                <div className="bg-amber-100 border border-amber-300 text-amber-900 px-4 py-1.5 rounded-full flex items-center gap-2 animate-pulse">
+              {isOverdue && !isSuperAdmin && !isSuspended && (
+                <div className="bg-amber-100 border border-amber-300 text-amber-900 px-4 py-1.5 rounded-full flex items-center gap-2">
                   <AlertTriangle className="w-4 h-4 text-amber-600" />
-                  <span className="text-xs font-bold uppercase tracking-tight">Servicio Suspendido - Regularice su pago</span>
+                  <span className="text-xs font-bold uppercase tracking-tight">Aviso: Pago vencido. Periodo de gracia activo.</span>
                 </div>
               )}
             </div>
@@ -175,8 +148,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           </header>
           <main className="flex-1 overflow-auto p-8 relative">
             {isSuspended && !isSuperAdmin && (
-              <div className="absolute inset-0 bg-white/60 backdrop-blur-[2px] z-[100] flex items-center justify-center p-8">
-                <div className="max-w-xl w-full bg-white border-2 border-amber-200 rounded-3xl shadow-2xl p-10 text-center space-y-6">
+              <div className="absolute inset-0 bg-white/60 backdrop-blur-[2px] z-[100] flex items-center justify-center p-8 text-center">
+                <div className="max-w-xl w-full bg-white border-2 border-amber-200 rounded-3xl shadow-2xl p-10 space-y-6">
                   <div className="w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto">
                     <AlertTriangle className="w-10 h-10" />
                   </div>
