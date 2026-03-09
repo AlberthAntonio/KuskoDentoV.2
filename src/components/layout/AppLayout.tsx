@@ -4,7 +4,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { SidebarProvider, Sidebar, SidebarContent, SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarTrigger, SidebarInset } from '@/components/ui/sidebar';
-import { Users, UserSquare2, Stethoscope, Landmark, Activity, Calendar, Database, LogOut, LayoutDashboard, ShieldCheck, BarChart3, CreditCard, AlertTriangle, QrCode, Building2, ShieldAlert, Banknote, User as UserIcon, X, CheckCircle2, MessageCircle, Boxes } from 'lucide-react';
+import { Users, UserSquare2, Stethoscope, Landmark, Activity, Calendar, Database, LogOut, LayoutDashboard, ShieldCheck, BarChart3, CreditCard, AlertTriangle, QrCode, Building2, ShieldAlert, Banknote, User as UserIcon, X, CheckCircle2, MessageCircle, Boxes, Wallet } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -107,27 +107,47 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           </SidebarContent>
           <div className="mt-auto p-6 border-t">
             {!isAdmin && (
-              <div className="mb-4 px-2">
-                <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Estado de Cuenta</p>
-                <Badge 
-                  variant={currentStatus === 'active' ? 'default' : 'destructive'} 
-                  className={cn(
-                    "w-full justify-center py-1",
-                    isOverdue && "bg-amber-500 hover:bg-amber-600"
-                  )}
+              <div className="mb-4 px-2 space-y-3">
+                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100 space-y-2">
+                  <div className="flex justify-between items-center">
+                    <p className="text-[10px] uppercase font-black text-muted-foreground tracking-widest">Suscripción</p>
+                    <Badge 
+                      variant={currentStatus === 'active' ? 'default' : 'destructive'} 
+                      className={cn(
+                        "text-[9px] h-4 font-black px-1.5",
+                        isOverdue && "bg-amber-500 hover:bg-amber-600",
+                        currentStatus === 'active' && "bg-emerald-500 hover:bg-emerald-600"
+                      )}
+                    >
+                      {isBlocked ? 'BLOQUEADA' : isSuspended ? 'SUSPENDIDA' : isOverdue ? 'MORA' : 'ACTIVA'}
+                    </Badge>
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <p className="flex justify-between text-[10px] font-bold">
+                      <span className="text-muted-foreground">MENSUALIDAD:</span>
+                      <span className="text-primary">S/. {user.subscriptionFee?.toFixed(2)}</span>
+                    </p>
+                    {user.nextPaymentDate && (
+                      <p className="flex justify-between text-[10px] font-bold">
+                        <span className="text-muted-foreground">VENCIMIENTO:</span>
+                        <span className={cn(isOverdue ? "text-amber-600" : "text-slate-600")}>
+                          {format(parseISO(user.nextPaymentDate), 'dd/MM/yyyy')}
+                        </span>
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <Button 
+                  variant="default" 
+                  size="sm" 
+                  className="w-full h-10 text-[10px] font-black gap-2 shadow-lg shadow-primary/10 rounded-xl uppercase tracking-widest" 
+                  onClick={() => setIsPayModalOpen(true)}
                 >
-                  {isBlocked ? 'BLOQUEADA' : isSuspended ? 'SUSPENDIDA' : isOverdue ? 'MORA' : 'ACTIVA'}
-                </Badge>
-                {user.nextPaymentDate && (
-                  <p className="text-[9px] text-center mt-2 text-muted-foreground font-bold">
-                    Vence: {format(parseISO(user.nextPaymentDate), 'dd/MM/yyyy')}
-                  </p>
-                )}
-                {(isOverdue || isSuspended) && (
-                  <Button variant="outline" size="sm" className="w-full mt-2 h-8 text-[10px] font-bold border-primary text-primary hover:bg-primary/5" onClick={() => setIsPayModalOpen(true)}>
-                    PAGAR AQUÍ
-                  </Button>
-                )}
+                  <Wallet className="w-3.5 h-3.5" />
+                  Pagar / Renovar
+                </Button>
               </div>
             )}
             <button 
@@ -144,9 +164,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             <SidebarTrigger />
             <div className="flex-1 flex justify-center">
               {isOverdue && !isAdmin && !isSuspended && (
-                <div className="bg-amber-100 border border-amber-300 text-amber-900 px-4 py-1.5 rounded-full flex items-center gap-3">
+                <div className="bg-amber-100 border border-amber-300 text-amber-900 px-4 py-1.5 rounded-full flex items-center gap-3 animate-pulse">
                   <AlertTriangle className="w-4 h-4 text-amber-600" />
-                  <span className="text-xs font-bold uppercase tracking-tight">Periodo de gracia activo. Regularice su pago.</span>
+                  <span className="text-xs font-bold uppercase tracking-tight">Periodo de gracia activo. Regularice su pago hoy.</span>
                   <Button variant="ghost" size="sm" className="h-6 text-[10px] font-black underline p-0 hover:bg-transparent ml-2" onClick={() => setIsPayModalOpen(true)}>PAGAR AQUÍ</Button>
                 </div>
               )}
@@ -228,7 +248,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 <Banknote className="w-6 h-6 text-emerald-600" /> Medios de Pago Autorizados
               </DialogTitle>
               <DialogDescription className="text-sm font-medium">
-                Realice el abono y envíe la captura de pantalla a uno de nuestros números de soporte técnico.
+                Realice su abono mensual o adelanto para mantener su servicio activo. Luego, envíe el comprobante a soporte.
               </DialogDescription>
             </DialogHeader>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-6">
