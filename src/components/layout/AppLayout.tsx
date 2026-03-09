@@ -163,7 +163,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           <main className="flex-1 overflow-auto p-8 relative">
             {isSuspended && !isAdmin && (
               <div className="absolute inset-0 bg-white/80 backdrop-blur-[4px] z-[100] flex items-center justify-center p-8 text-center">
-                <div className="max-w-3xl w-full bg-white border-2 border-amber-200 rounded-3xl shadow-2xl p-10 space-y-6 overflow-y-auto max-h-full scrollbar-hide">
+                <div className="max-w-4xl w-full bg-white border-2 border-amber-200 rounded-3xl shadow-2xl p-10 space-y-6 overflow-y-auto max-h-full scrollbar-hide">
                   <div className="w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto">
                     <AlertTriangle className="w-10 h-10" />
                   </div>
@@ -172,41 +172,43 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                     Su acceso ha sido restringido por falta de pago. Realice el depósito y envíe el comprobante a cualquiera de nuestros administradores para reactivar sus módulos.
                   </p>
                   
-                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 text-left space-y-4">
+                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-8 text-left space-y-6">
                     <p className="text-xs font-black uppercase text-slate-400 tracking-widest border-b pb-2">Información para Pagos</p>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       {paymentMethods.map(m => (
-                        <div key={m.id} className="bg-white p-4 rounded-xl border border-slate-100 flex flex-col items-center text-center gap-3">
-                           <div className="p-2 bg-primary/5 rounded-lg text-primary">
-                             {m.type === 'qr' ? <QrCode className="w-5 h-5" /> : <Building2 className="w-5 h-5" />}
+                        <div key={m.id} className="bg-white p-6 rounded-2xl border border-slate-100 flex flex-col items-center text-center gap-4 shadow-sm hover:shadow-md transition-all">
+                           <div className="p-3 bg-primary/5 rounded-xl text-primary">
+                             {m.type === 'qr' ? <QrCode className="w-6 h-6" /> : <Building2 className="w-6 h-6" />}
                            </div>
-                           <div className="min-w-0 w-full">
-                             <p className="text-[10px] font-black uppercase text-muted-foreground leading-none mb-1">{m.label}</p>
-                             <p className="text-sm font-bold text-slate-900 break-all">{m.value}</p>
+                           <div className="min-w-0 w-full space-y-2">
+                             <p className="text-[10px] font-black uppercase text-muted-foreground leading-none tracking-widest">{m.label}</p>
+                             <p className="text-lg font-black text-slate-900 break-all">{m.value}</p>
                              {m.qrImage && (
-                               <div className="mt-4 p-2 bg-white border rounded-xl inline-block shadow-sm">
-                                 <img src={m.qrImage} className="w-40 h-40 object-contain mx-auto" alt="QR de Pago" />
-                                 <p className="text-[10px] font-bold text-primary mt-2 uppercase tracking-widest">Escanea para pagar</p>
+                               <div className="mt-4 p-4 bg-white border-2 border-primary/20 rounded-2xl inline-block shadow-lg">
+                                 <img src={m.qrImage} className="w-64 h-64 object-contain mx-auto" alt="QR de Pago" />
+                                 <div className="mt-3 py-2 bg-primary text-white rounded-lg">
+                                   <p className="text-[10px] font-bold uppercase tracking-widest">Escanea con Yape o Plin</p>
+                                 </div>
                                </div>
                              )}
                            </div>
                         </div>
                       ))}
-                      {paymentMethods.length === 0 && <p className="col-span-full text-xs text-center text-muted-foreground italic py-4">Consulte los medios de pago con el administrador.</p>}
+                      {paymentMethods.length === 0 && <p className="col-span-full text-xs text-center text-muted-foreground italic py-8">Consulte los medios de pago con el administrador.</p>}
                     </div>
                   </div>
 
-                  <div className="space-y-4">
-                    <p className="text-[10px] uppercase font-black text-muted-foreground tracking-[0.2em]">Reportar Pago vía WhatsApp</p>
+                  <div className="space-y-6">
+                    <p className="text-[10px] uppercase font-black text-muted-foreground tracking-[0.2em]">Reportar Pago vía WhatsApp (Captura de pantalla)</p>
                     <div className="flex flex-col sm:flex-row justify-center gap-4">
-                      <a href="https://wa.me/51929110834" target="_blank" className="flex-1 h-14 bg-emerald-600 text-white text-xs font-black rounded-2xl hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-100 flex items-center justify-center gap-2 uppercase">
-                        <MessageCircle className="w-5 h-5" /> Reportar a Adm. 1
+                      <a href="https://wa.me/51929110834" target="_blank" className="flex-1 h-16 bg-emerald-600 text-white text-sm font-black rounded-2xl hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-100 flex items-center justify-center gap-3 uppercase">
+                        <MessageCircle className="w-6 h-6" /> Reportar a Adm. 1 (+51929110834)
                       </a>
-                      <a href="https://wa.me/51942239654" target="_blank" className="flex-1 h-14 bg-emerald-600 text-white text-xs font-black rounded-2xl hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-100 flex items-center justify-center gap-2 uppercase">
-                        <MessageCircle className="w-5 h-5" /> Reportar a Adm. 2
+                      <a href="https://wa.me/51942239654" target="_blank" className="flex-1 h-16 bg-emerald-600 text-white text-sm font-black rounded-2xl hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-100 flex items-center justify-center gap-3 uppercase">
+                        <MessageCircle className="w-6 h-6" /> Reportar a Adm. 2 (+51942239654)
                       </a>
                     </div>
-                    <button onClick={logout} className="text-sm font-bold text-red-600 hover:bg-red-50 px-6 py-2 rounded-xl transition-colors">
+                    <button onClick={logout} className="text-sm font-bold text-red-600 hover:bg-red-50 px-8 py-3 rounded-xl transition-colors">
                       Cerrar Sesión
                     </button>
                   </div>
@@ -219,47 +221,50 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
         {/* Modal Pagar Aquí */}
         <Dialog open={isPayModalOpen} onOpenChange={setIsPayModalOpen}>
-          <DialogContent className="sm:max-w-2xl rounded-3xl max-h-[90vh] overflow-y-auto scrollbar-hide">
+          <DialogContent className="sm:max-w-3xl rounded-3xl max-h-[90vh] overflow-y-auto scrollbar-hide">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 text-2xl font-bold">
                 <Banknote className="w-6 h-6 text-emerald-600" /> Medios de Pago Autorizados
               </DialogTitle>
-              <DialogDescription>
-                Realice el abono y envíe la captura de pantalla a uno de nuestros números de soporte.
+              <DialogDescription className="text-sm font-medium">
+                Realice el abono y envíe la captura de pantalla a uno de nuestros números de soporte técnico.
               </DialogDescription>
             </DialogHeader>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-6">
               {paymentMethods.map(m => (
-                <div key={m.id} className="p-4 rounded-2xl border bg-slate-50 flex flex-col items-center gap-4 transition-all hover:bg-white hover:shadow-md group">
-                   <div className="p-3 bg-white rounded-xl text-primary border border-slate-100 group-hover:scale-105 transition-transform">
-                     {m.type === 'qr' ? <QrCode className="w-6 h-6" /> : <Building2 className="w-6 h-6" />}
+                <div key={m.id} className="p-6 rounded-2xl border bg-slate-50 flex flex-col items-center gap-4 transition-all hover:bg-white hover:shadow-lg group">
+                   <div className="p-4 bg-white rounded-xl text-primary border border-slate-100 group-hover:scale-105 transition-transform">
+                     {m.type === 'qr' ? <QrCode className="w-8 h-8" /> : <Building2 className="w-8 h-8" />}
                    </div>
-                   <div className="text-center w-full">
-                      <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest leading-none mb-1">{m.label}</p>
-                      <p className="text-lg font-black text-slate-800 break-all">{m.value}</p>
+                   <div className="text-center w-full space-y-2">
+                      <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest leading-none">{m.label}</p>
+                      <p className="text-xl font-black text-slate-800 break-all">{m.value}</p>
                       {m.qrImage && (
-                        <div className="mt-4 p-3 bg-white rounded-2xl inline-block border border-slate-200 shadow-sm">
-                          <img src={m.qrImage} className="w-48 h-48 object-contain" alt="QR Scan" />
-                          <p className="text-[9px] font-black text-primary mt-2 uppercase">Escanear QR</p>
+                        <div className="mt-4 p-4 bg-white rounded-2xl inline-block border-2 border-primary/20 shadow-xl group-hover:border-primary transition-colors">
+                          <img src={m.qrImage} className="w-60 h-60 object-contain mx-auto" alt="QR Scan" />
+                          <div className="mt-3 py-2 bg-primary/10 text-primary rounded-lg">
+                            <p className="text-[9px] font-black uppercase tracking-widest">Escanea para pagar</p>
+                          </div>
                         </div>
                       )}
                    </div>
                 </div>
               ))}
               {paymentMethods.length === 0 && (
-                <div className="col-span-full text-center py-10 text-muted-foreground">
-                   <p className="text-sm italic">No se han registrado medios de pago aún.</p>
+                <div className="col-span-full text-center py-16 text-muted-foreground">
+                   <AlertTriangle className="w-12 h-12 mx-auto mb-4 opacity-20" />
+                   <p className="text-sm font-bold uppercase tracking-widest">No hay medios de pago registrados.</p>
                 </div>
               )}
             </div>
-            <div className="pt-6 border-t space-y-4">
-              <p className="text-[10px] font-black text-center text-muted-foreground uppercase tracking-widest">Enviar comprobante de pago a:</p>
+            <div className="pt-8 border-t space-y-6">
+              <p className="text-[10px] font-black text-center text-muted-foreground uppercase tracking-[0.3em]">Enviar comprobante (Captura) a:</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <a href="https://wa.me/51929110834" target="_blank" className="h-14 bg-emerald-600 text-white rounded-2xl font-black text-xs flex items-center justify-center gap-3 shadow-xl shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-95 uppercase">
-                   <MessageCircle className="w-5 h-5" /> WhatsApp Adm. 1
+                <a href="https://wa.me/51929110834" target="_blank" className="h-16 bg-emerald-600 text-white rounded-2xl font-black text-xs flex items-center justify-center gap-3 shadow-xl shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-95 uppercase px-4">
+                   <MessageCircle className="w-6 h-6" /> WhatsApp Adm. 1 (+51929110834)
                 </a>
-                <a href="https://wa.me/51942239654" target="_blank" className="h-14 bg-emerald-600 text-white rounded-2xl font-black text-xs flex items-center justify-center gap-3 shadow-xl shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-95 uppercase">
-                   <MessageCircle className="w-5 h-5" /> WhatsApp Adm. 2
+                <a href="https://wa.me/51942239654" target="_blank" className="h-16 bg-emerald-600 text-white rounded-2xl font-black text-xs flex items-center justify-center gap-3 shadow-xl shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-95 uppercase px-4">
+                   <MessageCircle className="w-6 h-6" /> WhatsApp Adm. 2 (+51942239654)
                 </a>
               </div>
             </div>
