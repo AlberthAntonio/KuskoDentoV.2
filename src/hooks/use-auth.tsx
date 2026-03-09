@@ -14,6 +14,12 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Credenciales maestras para los dos únicos Súper Administradores
+const MASTER_SUPERADMINS = [
+  { username: 'admin1', password: 'KuskoAdmin01*', fullName: 'Súper Administrador Principal' },
+  { username: 'admin2', password: 'KuskoAdmin02*', fullName: 'Súper Administrador Secundario' }
+];
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -36,16 +42,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const users = await db.getAll<User>('users');
     let authenticatedUser: User | null = null;
     
-    // 1. Verificar credenciales maestras de Super Administrador
-    if (username === 'superadmin' && password === 'superadmin') {
-      const existingSuper = users.find(u => u.username === 'superadmin');
+    // 1. Verificar si son credenciales de los Súper Administradores maestros
+    const masterMatch = MASTER_SUPERADMINS.find(ma => ma.username === username && ma.password === password);
+
+    if (masterMatch) {
+      const existingSuper = users.find(u => u.username === username);
       if (!existingSuper) {
         authenticatedUser = { 
-          id: 'su-admin-master', 
-          username: 'superadmin', 
-          password: 'superadmin',
+          id: `su-admin-${username}`, 
+          username: masterMatch.username, 
+          password: masterMatch.password,
           role: 'superadmin',
-          fullName: 'Súper Administrador',
+          fullName: masterMatch.fullName,
           status: 'active',
           lastLogin: new Date().toISOString(),
           subscriptionStatus: 'active'
@@ -56,11 +64,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await db.put('users', authenticatedUser);
       }
     }
-    // 2. Buscar en la base de datos
+    // 2. Buscar consultorios o personal en la base de datos local
     else {
       const foundUser = users.find(u => u.username === username && u.password === password);
       if (foundUser) {
-        // VALIDACIÓN DE BLOQUEO
+        // VALIDACIÓN DE BLOQUEO PERMANENTE
         if (foundUser.subscriptionStatus === 'blocked') {
           return { success: false, message: 'Cuenta Bloqueada. Comuníquese con el administrador.' };
         }
