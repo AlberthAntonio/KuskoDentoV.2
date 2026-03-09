@@ -17,25 +17,14 @@ import Link from 'next/link';
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
   const pathname = usePathname();
+  
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [isPayModalOpen, setIsPayModalOpen] = useState(false);
-  
-  // Estados para el recordatorio de Mora
   const [isMoraReminderOpen, setIsMoraReminderOpen] = useState(false);
   const [moraCountdown, setMoraCountdown] = useState(5);
 
-  useEffect(() => {
-    if (user && user.role === 'clinic') {
-      db.getAll<PaymentMethod>('payment_methods').then(setPaymentMethods);
-    }
-  }, [user]);
-
-  if (!user) return null;
-
-  const isAdmin = user.role === 'admin';
-  const isClinic = user.role === 'clinic';
-  
-  const getCalculatedStatus = () => {
+  // Determinar estados de suscripción de forma segura
+  const currentStatus = user ? (() => {
     if (user.subscriptionStatus === 'blocked') return 'blocked';
     if (!user.nextPaymentDate) return 'active';
     const next = parseISO(user.nextPaymentDate);
@@ -43,30 +32,37 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     if (isAfter(today, addDays(next, 10))) return 'suspended';
     if (isAfter(today, next)) return 'overdue';
     return 'active';
-  };
+  })() : 'active';
 
-  const currentStatus = getCalculatedStatus();
+  const isAdmin = user?.role === 'admin';
+  const isClinic = user?.role === 'clinic';
   const isSuspended = currentStatus === 'suspended';
   const isBlocked = currentStatus === 'blocked';
   const isOverdue = currentStatus === 'overdue';
 
-  // Lógica del recordatorio cada 5 minutos si está en MORA
+  // Hook 1: Carga de métodos de pago
   useEffect(() => {
-    if (isOverdue && !isAdmin) {
-      // Mostrar inmediatamente al cargar
+    if (user && user.role === 'clinic') {
+      db.getAll<PaymentMethod>('payment_methods').then(setPaymentMethods);
+    }
+  }, [user]);
+
+  // Hook 2: Lógica del recordatorio cada 5 minutos si está en MORA
+  useEffect(() => {
+    if (isOverdue && !isAdmin && user) {
       setIsMoraReminderOpen(true);
       setMoraCountdown(5);
 
       const interval = setInterval(() => {
         setIsMoraReminderOpen(true);
         setMoraCountdown(5);
-      }, 5 * 60 * 1000); // 5 minutos
+      }, 5 * 60 * 1000);
 
       return () => clearInterval(interval);
     }
-  }, [isOverdue, isAdmin]);
+  }, [isOverdue, isAdmin, user]);
 
-  // Lógica del contador de 5 segundos para cerrar el aviso de mora
+  // Hook 3: Lógica del contador de 5 segundos para cerrar el aviso
   useEffect(() => {
     let timer: NodeJS.Timeout;
     if (isMoraReminderOpen && moraCountdown > 0) {
@@ -76,6 +72,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     }
     return () => clearInterval(timer);
   }, [isMoraReminderOpen, moraCountdown]);
+
+  // Validación de sesión (Después de todos los hooks)
+  if (!user) return null;
 
   const menuItems = [
     { icon: LayoutDashboard, label: 'Panel Principal', href: '/dashboard', show: true },
@@ -327,7 +326,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         <Dialog 
           open={isMoraReminderOpen} 
           onOpenChange={(open) => {
-            // Impedir cierre si el contador es mayor a 0
             if (!open && moraCountdown > 0) return;
             setIsMoraReminderOpen(open);
           }}
