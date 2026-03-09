@@ -29,7 +29,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (session) {
       try {
         const parsed = JSON.parse(session);
-        // Normalización de roles antiguos
+        // Normalización estricta: si el rol guardado no es uno de los permitidos, forzar cierre
         if (parsed.role === 'superadmin') {
           parsed.role = 'admin';
         }
@@ -45,48 +45,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const users = await db.getAll<User>('users');
     let authenticatedUser: User | null = null;
     
-    // 1. Verificar en la base de datos local
-    const foundUser = users.find(u => u.username === username && u.password === password);
-    if (foundUser) {
-      if (foundUser.subscriptionStatus === 'blocked') {
-        return { success: false, message: 'Cuenta Bloqueada. Comuníquese con el administrador.' };
-      }
-      
-      // Asegurar que si es un admin maestro guardado en DB, mantenga el rol 'admin'
-      const isMaster = MASTER_ADMINS.some(ma => ma.username === foundUser.username);
+    // 1. Verificar si es una de las dos cuentas maestras
+    const masterMatch = MASTER_ADMINS.find(ma => ma.username === username && ma.password === password);
+    
+    if (masterMatch) {
       authenticatedUser = { 
-        ...foundUser, 
-        role: isMaster ? 'admin' : foundUser.role,
-        status: 'active', 
-        lastLogin: new Date().toISOString() 
+        id: `admin-${username}`, 
+        username: masterMatch.username, 
+        password: masterMatch.password,
+        role: 'admin',
+        fullName: masterMatch.fullName,
+        status: 'active',
+        lastLogin: new Date().toISOString(),
+        subscriptionStatus: 'active'
       };
-      
       await db.put('users', authenticatedUser);
-    }
-    // 2. Fallback a credenciales maestras (admin1 / admin2)
+    } 
+    // 2. Verificar en la base de datos local (Consultorios y Personal)
     else {
-      const masterMatch = MASTER_ADMINS.find(ma => ma.username === username && ma.password === password);
-      if (masterMatch) {
+      const foundUser = users.find(u => u.username === username && u.password === password);
+      if (foundUser) {
+        if (foundUser.subscriptionStatus === 'blocked') {
+          return { success: false, message: 'Cuenta Bloqueada. Comuníquese con el administrador.' };
+        }
+        
         authenticatedUser = { 
-          id: `admin-${username}`, 
-          username: masterMatch.username, 
-          password: masterMatch.password,
-          role: 'admin',
-          fullName: masterMatch.fullName,
-          status: 'active',
-          lastLogin: new Date().toISOString(),
-          subscriptionStatus: 'active'
+          ...foundUser, 
+          status: 'active', 
+          lastLogin: new Date().toISOString() 
         };
+        
         await db.put('users', authenticatedUser);
       }
     }
 
     if (authenticatedUser) {
-      // Normalización final antes de guardar sesión
-      if ((authenticatedUser as any).role === 'superadmin') {
-        authenticatedUser.role = 'admin';
-      }
-      
       setUser(authenticatedUser);
       localStorage.setItem('kd_session', JSON.stringify(authenticatedUser));
       return { success: true };

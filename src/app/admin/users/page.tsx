@@ -105,33 +105,33 @@ function UsersContent() {
     e.preventDefault();
     if (!currentUser) return;
 
-    const isCreatingClinic = currentUser.role === 'admin';
+    const isAdmin = currentUser.role === 'admin';
 
     const newUser: User = {
       id: editingId || crypto.randomUUID(),
-      username: isCreatingClinic ? form.username : undefined,
-      password: isCreatingClinic ? form.password : undefined,
+      username: isAdmin ? form.username : undefined,
+      password: isAdmin ? form.password : undefined,
       fullName: form.fullName,
       dni: form.dni,
       address: form.address,
       colegiatura: form.colegiatura,
       photo: photoPreview || undefined,
-      role: isCreatingClinic ? 'clinic' : form.role,
+      role: isAdmin ? 'clinic' : form.role,
       clinicId: currentUser.role === 'clinic' ? currentUser.id : undefined,
       status: editingId ? (users.find(u => u.id === editingId)?.status || 'inactive') : 'inactive',
-      subscriptionFee: isCreatingClinic ? parseFloat(form.subscriptionFee) : undefined,
-      nextPaymentDate: isCreatingClinic ? form.nextPaymentDate : undefined,
-      contractStartDate: isCreatingClinic ? form.contractStartDate : undefined,
+      subscriptionFee: isAdmin ? parseFloat(form.subscriptionFee) : undefined,
+      nextPaymentDate: isAdmin ? form.nextPaymentDate : undefined,
+      contractStartDate: isAdmin ? form.contractStartDate : undefined,
       paymentFrequency: 'monthly',
       subscriptionStatus: form.subscriptionStatus,
-      registeredByAdminId: (isCreatingClinic && !editingId) ? currentUser.username : (users.find(u => u.id === editingId)?.registeredByAdminId)
+      registeredByAdminId: (isAdmin && !editingId) ? currentUser.username : (users.find(u => u.id === editingId)?.registeredByAdminId)
     };
 
     await db.put('users', newUser);
 
-    if (isCreatingClinic && !editingId) {
+    if (isAdmin && !editingId) {
       const installments = parseInt(form.advanceInstallments) || 1;
-      const totalAmount = parseFloat(form.subscriptionFee) * installments;
+      const totalAmount = (newUser.subscriptionFee || 0) * installments;
       
       await db.put('subscription_payments', {
         id: crypto.randomUUID(),
