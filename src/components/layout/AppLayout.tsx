@@ -4,13 +4,13 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { SidebarProvider, Sidebar, SidebarContent, SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarTrigger, SidebarInset } from '@/components/ui/sidebar';
-import { Users, UserSquare2, Stethoscope, Landmark, Activity, Calendar, Database, LogOut, LayoutDashboard, ShieldCheck, BarChart3, CreditCard, AlertTriangle, QrCode, Building2, ShieldAlert, Banknote, User as UserIcon, X, CheckCircle2, MessageCircle, Boxes, Wallet } from 'lucide-react';
+import { Users, UserSquare2, Stethoscope, Landmark, Activity, Calendar, Database, LogOut, LayoutDashboard, ShieldCheck, BarChart3, CreditCard, AlertTriangle, QrCode, Building2, ShieldAlert, Banknote, User as UserIcon, X, CheckCircle2, MessageCircle, Boxes, Wallet, Timer, AlertCircle } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { format, isAfter, parseISO, addDays } from 'date-fns';
 import { db, PaymentMethod } from '@/lib/db';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 
@@ -19,6 +19,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [isPayModalOpen, setIsPayModalOpen] = useState(false);
+  
+  // Estados para el recordatorio de Mora
+  const [isMoraReminderOpen, setIsMoraReminderOpen] = useState(false);
+  const [moraCountdown, setMoraCountdown] = useState(5);
 
   useEffect(() => {
     if (user && user.role === 'clinic') {
@@ -45,6 +49,33 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const isSuspended = currentStatus === 'suspended';
   const isBlocked = currentStatus === 'blocked';
   const isOverdue = currentStatus === 'overdue';
+
+  // Lógica del recordatorio cada 5 minutos si está en MORA
+  useEffect(() => {
+    if (isOverdue && !isAdmin) {
+      // Mostrar inmediatamente al cargar
+      setIsMoraReminderOpen(true);
+      setMoraCountdown(5);
+
+      const interval = setInterval(() => {
+        setIsMoraReminderOpen(true);
+        setMoraCountdown(5);
+      }, 5 * 60 * 1000); // 5 minutos
+
+      return () => clearInterval(interval);
+    }
+  }, [isOverdue, isAdmin]);
+
+  // Lógica del contador de 5 segundos para cerrar el aviso de mora
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (isMoraReminderOpen && moraCountdown > 0) {
+      timer = setInterval(() => {
+        setMoraCountdown((prev) => prev - 1);
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [isMoraReminderOpen, moraCountdown]);
 
   const menuItems = [
     { icon: LayoutDashboard, label: 'Panel Principal', href: '/dashboard', show: true },
@@ -289,6 +320,71 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 </a>
               </div>
             </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Modal Recordatorio Recurrente de Mora (Cada 5 min) */}
+        <Dialog 
+          open={isMoraReminderOpen} 
+          onOpenChange={(open) => {
+            // Impedir cierre si el contador es mayor a 0
+            if (!open && moraCountdown > 0) return;
+            setIsMoraReminderOpen(open);
+          }}
+        >
+          <DialogContent 
+            className="sm:max-w-2xl rounded-3xl border-amber-200 shadow-2xl"
+            onPointerDownOutside={(e) => e.preventDefault()}
+            onEscapeKeyDown={(e) => e.preventDefault()}
+          >
+            <DialogHeader className="text-center">
+              <div className="w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                <AlertCircle className="w-10 h-10" />
+              </div>
+              <DialogTitle className="text-2xl font-black text-slate-900 uppercase tracking-tight">Recordatorio de Pago Pendiente</DialogTitle>
+              <DialogDescription className="text-sm font-medium text-slate-600 mt-2">
+                Su servicio se encuentra en periodo de mora. Regularice su pago para evitar la suspensión definitiva de sus módulos odontológicos.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="py-6 space-y-6">
+              <div className="bg-amber-50 border border-amber-100 p-4 rounded-2xl flex items-center justify-between">
+                <div>
+                  <p className="text-[10px] font-black text-amber-800 uppercase tracking-widest">Monto de Mensualidad</p>
+                  <p className="text-2xl font-black text-amber-600">S/. {user.subscriptionFee?.toFixed(2)}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[10px] font-black text-amber-800 uppercase tracking-widest">Estado</p>
+                  <Badge className="bg-amber-500 font-black">EN MORA</Badge>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {paymentMethods.slice(0, 2).map(m => (
+                  <div key={m.id} className="p-4 rounded-xl border bg-white flex flex-col items-center gap-2 text-center shadow-sm">
+                    <p className="text-[9px] font-black uppercase text-muted-foreground">{m.label}</p>
+                    <p className="text-sm font-bold text-slate-800 break-all">{m.value}</p>
+                    {m.qrImage && <img src={m.qrImage} className="w-24 h-24 object-contain mt-1" alt="QR Mini" />}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <DialogFooter className="flex flex-col sm:flex-row gap-3 pt-4 border-t">
+              <div className="flex-1 flex items-center gap-2 text-muted-foreground">
+                <Timer className="w-4 h-4" />
+                <span className="text-xs font-bold uppercase tracking-widest">
+                  {moraCountdown > 0 ? `Cerrar en ${moraCountdown}s` : 'Ya puede cerrar este aviso'}
+                </span>
+              </div>
+              <Button 
+                onClick={() => setIsMoraReminderOpen(false)} 
+                disabled={moraCountdown > 0}
+                className="w-full sm:w-48 h-12 font-black rounded-xl shadow-lg shadow-primary/10 uppercase tracking-widest"
+              >
+                Entendido
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
