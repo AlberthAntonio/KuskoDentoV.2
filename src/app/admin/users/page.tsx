@@ -125,7 +125,9 @@ function UsersContent() {
       nextPaymentDate: isCreatingClinic ? form.nextPaymentDate : undefined,
       contractStartDate: isCreatingClinic ? form.contractStartDate : undefined,
       paymentFrequency: 'monthly',
-      subscriptionStatus: form.subscriptionStatus
+      subscriptionStatus: form.subscriptionStatus,
+      // Almacenar qué administrador está registrando el consultorio
+      registeredByAdminId: (isCreatingClinic && !editingId) ? currentUser.id : (users.find(u => u.id === editingId)?.registeredByAdminId)
     };
 
     await db.put('users', newUser);
@@ -140,7 +142,8 @@ function UsersContent() {
         clinicName: newUser.fullName || newUser.username || 'Nuevo Consultorio',
         amount: totalAmount,
         date: new Date().toISOString().split('T')[0],
-        concept: `Pago inicial: ${installments} cuota(s) mensuales adelantadas`
+        concept: `Pago inicial: ${installments} cuota(s) mensuales adelantadas`,
+        processedByAdminId: currentUser.id
       });
     }
 
@@ -434,6 +437,11 @@ function UsersContent() {
                        u.role === 'assistant' ? 'Asistente' : 'Técnico'
                      }
                    </CardDescription>
+                   {isSuperAdmin && u.registeredByAdminId && (
+                     <p className="text-[9px] font-bold text-muted-foreground mt-1 flex items-center gap-1">
+                       <Shield className="w-2 h-2" /> Por: {u.registeredByAdminId.replace('su-admin-', '')}
+                     </p>
+                   )}
                  </div>
                </CardHeader>
                <CardContent className="space-y-4">

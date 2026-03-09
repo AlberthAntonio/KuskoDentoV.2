@@ -25,6 +25,8 @@ export interface User {
   contractStartDate?: string;
   paymentFrequency?: 'monthly' | 'yearly';
   subscriptionStatus: 'active' | 'suspended' | 'blocked';
+  // Trazabilidad administrativa
+  registeredByAdminId?: string;
 }
 
 export interface Patient {
@@ -131,6 +133,7 @@ export interface SubscriptionPayment {
   amount: number;
   date: string;
   concept: string;
+  processedByAdminId?: string;
 }
 
 export class LocalDB {
