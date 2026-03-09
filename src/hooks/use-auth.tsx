@@ -14,7 +14,6 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Credenciales maestras para los dos únicos Súper Administradores
 const MASTER_SUPERADMINS = [
   { username: 'admin1', password: 'KuskoAdmin01*', fullName: 'Súper Administrador Principal' },
   { username: 'admin2', password: 'KuskoAdmin02*', fullName: 'Súper Administrador Secundario' }
@@ -42,39 +41,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const users = await db.getAll<User>('users');
     let authenticatedUser: User | null = null;
     
-    // 1. Verificar si son credenciales de los Súper Administradores maestros
-    const masterMatch = MASTER_SUPERADMINS.find(ma => ma.username === username && ma.password === password);
-
-    if (masterMatch) {
-      const existingSuper = users.find(u => u.username === username);
-      if (!existingSuper) {
-        authenticatedUser = { 
-          id: `su-admin-${username}`, 
-          username: masterMatch.username, 
-          password: masterMatch.password,
-          role: 'superadmin',
-          fullName: masterMatch.fullName,
-          status: 'active',
-          lastLogin: new Date().toISOString(),
-          subscriptionStatus: 'active'
-        };
-        await db.put('users', authenticatedUser);
-      } else {
-        authenticatedUser = { ...existingSuper, status: 'active', lastLogin: new Date().toISOString() };
-        await db.put('users', authenticatedUser);
+    // 1. Verificar primero en la base de datos local (por si cambiaron la contraseña)
+    const foundUser = users.find(u => u.username === username && u.password === password);
+    if (foundUser) {
+      if (foundUser.subscriptionStatus === 'blocked') {
+        return { success: false, message: 'Cuenta Bloqueada. Comuníquese con el administrador.' };
       }
+      authenticatedUser = { ...foundUser, status: 'active', lastLogin: new Date().toISOString() };
+      await db.put('users', authenticatedUser);
     }
-    // 2. Buscar consultorios o personal en la base de datos local
+    // 2. Si no coincide en la DB, verificar con las maestras (fallback)
     else {
-      const foundUser = users.find(u => u.username === username && u.password === password);
-      if (foundUser) {
-        // VALIDACIÓN DE BLOQUEO PERMANENTE
-        if (foundUser.subscriptionStatus === 'blocked') {
-          return { success: false, message: 'Cuenta Bloqueada. Comuníquese con el administrador.' };
+      const masterMatch = MASTER_SUPERADMINS.find(ma => ma.username === username && ma.password === password);
+      if (masterMatch) {
+        const existingSuper = users.find(u => u.username === username);
+        if (!existingSuper) {
+          authenticatedUser = { 
+            id: `su-admin-${username}`, 
+            username: masterMatch.username, 
+            password: masterMatch.password,
+            role: 'superadmin',
+            fullName: masterMatch.fullName,
+            status: 'active',
+            lastLogin: new Date().toISOString(),
+            subscriptionStatus: 'active'
+          };
+          await db.put('users', authenticatedUser);
+        } else {
+          authenticatedUser = { ...existingSuper, status: 'active', lastLogin: new Date().toISOString() };
+          await db.put('users', authenticatedUser);
         }
-        
-        authenticatedUser = { ...foundUser, status: 'active', lastLogin: new Date().toISOString() };
-        await db.put('users', authenticatedUser);
       }
     }
 

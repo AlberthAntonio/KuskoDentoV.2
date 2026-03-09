@@ -4,7 +4,7 @@
 import React from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { SidebarProvider, Sidebar, SidebarContent, SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarTrigger, SidebarInset } from '@/components/ui/sidebar';
-import { Users, UserSquare2, Stethoscope, Landmark, Activity, Calendar, Database, LogOut, LayoutDashboard, ShieldCheck, BarChart3, CreditCard, AlertTriangle, QrCode, Building2, ShieldAlert, Banknote } from 'lucide-react';
+import { Users, UserSquare2, Stethoscope, Landmark, Activity, Calendar, Database, LogOut, LayoutDashboard, ShieldCheck, BarChart3, CreditCard, AlertTriangle, QrCode, Building2, ShieldAlert, Banknote, User as UserIcon } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
@@ -20,7 +20,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const isSuperAdmin = user.role === 'superadmin';
   const isClinic = user.role === 'clinic';
   
-  // LÓGICA AUTOMÁTICA DE ESTADOS
   const getCalculatedStatus = () => {
     if (user.subscriptionStatus === 'blocked') return 'blocked';
     if (!user.nextPaymentDate) return 'active';
@@ -28,9 +27,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     const next = parseISO(user.nextPaymentDate);
     const today = new Date();
     
-    // Si pasaron más de 10 días del vencimiento -> Suspendido
     if (isAfter(today, addDays(next, 10))) return 'suspended';
-    // Si ya venció pero está en los 10 días de gracia -> Overdue (Activo con aviso)
     if (isAfter(today, next)) return 'overdue';
     
     return 'active';
@@ -53,6 +50,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     { icon: Activity, label: 'Odontograma', href: '/odontogram', show: !isSuperAdmin && !isSuspended },
     { icon: Calendar, label: 'Citas', href: '/appointments', show: !isSuperAdmin && !isSuspended },
     { icon: Database, label: 'Copia de Seguridad', href: '/backups', show: (isSuperAdmin || isClinic) && !isSuspended },
+    { icon: UserIcon, label: 'Mi Perfil', href: '/profile', show: true },
   ];
 
   if (isBlocked && !isSuperAdmin) {
