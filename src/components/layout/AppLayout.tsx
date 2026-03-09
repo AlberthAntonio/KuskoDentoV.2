@@ -4,7 +4,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { SidebarProvider, Sidebar, SidebarContent, SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarTrigger, SidebarInset } from '@/components/ui/sidebar';
-import { Users, UserSquare2, Stethoscope, Landmark, Activity, Calendar, Database, LogOut, LayoutDashboard, ShieldCheck, BarChart3, CreditCard, AlertTriangle, QrCode, Building2, ShieldAlert, Banknote, User as UserIcon, X, CheckCircle2 } from 'lucide-react';
+import { Users, UserSquare2, Stethoscope, Landmark, Activity, Calendar, Database, LogOut, LayoutDashboard, ShieldCheck, BarChart3, CreditCard, AlertTriangle, QrCode, Building2, ShieldAlert, Banknote, User as UserIcon, X, CheckCircle2, MessageCircle } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
@@ -50,7 +50,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     { icon: LayoutDashboard, label: 'Panel Principal', href: '/dashboard', show: true },
     { icon: BarChart3, label: 'Reportes', href: '/admin/reports', show: isAdmin },
     { icon: CreditCard, label: 'Suscripciones', href: '/admin/subscriptions', show: isAdmin },
-    { icon: Banknote, label: 'Pagos', href: '/admin/billing', show: isAdmin },
+    { icon: Banknote, label: 'Pagos de Red', href: '/admin/billing', show: isAdmin },
     { icon: isAdmin ? ShieldCheck : Users, label: isAdmin ? 'Consultorios' : 'Personal', href: '/admin/users', show: (isAdmin || isClinic) && !isSuspended },
     { icon: UserSquare2, label: 'Pacientes', href: '/patients', show: !isAdmin && !isSuspended },
     { icon: Stethoscope, label: 'Tratamientos', href: '/treatments', show: !isAdmin && !isSuspended },
@@ -146,7 +146,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 <div className="bg-amber-100 border border-amber-300 text-amber-900 px-4 py-1.5 rounded-full flex items-center gap-3">
                   <AlertTriangle className="w-4 h-4 text-amber-600" />
                   <span className="text-xs font-bold uppercase tracking-tight">Periodo de gracia activo. Regularice su pago.</span>
-                  <Button variant="ghost" size="sm" className="h-6 text-[10px] font-black underline p-0 hover:bg-transparent" onClick={() => setIsPayModalOpen(true)}>PAGAR AQUÍ</Button>
+                  <Button variant="ghost" size="sm" className="h-6 text-[10px] font-black underline p-0 hover:bg-transparent ml-2" onClick={() => setIsPayModalOpen(true)}>PAGAR AQUÍ</Button>
                 </div>
               )}
             </div>
@@ -163,27 +163,32 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           <main className="flex-1 overflow-auto p-8 relative">
             {isSuspended && !isAdmin && (
               <div className="absolute inset-0 bg-white/80 backdrop-blur-[4px] z-[100] flex items-center justify-center p-8 text-center">
-                <div className="max-w-2xl w-full bg-white border-2 border-amber-200 rounded-3xl shadow-2xl p-10 space-y-6 overflow-y-auto max-h-full">
+                <div className="max-w-3xl w-full bg-white border-2 border-amber-200 rounded-3xl shadow-2xl p-10 space-y-6 overflow-y-auto max-h-full scrollbar-hide">
                   <div className="w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto">
                     <AlertTriangle className="w-10 h-10" />
                   </div>
                   <h3 className="text-2xl font-bold text-slate-900 uppercase">Servicio Suspendido</h3>
                   <p className="text-slate-600 leading-relaxed font-medium">
-                    Su acceso ha sido restringido por falta de pago. Realice el depósito y envíe el comprobante para reactivar sus módulos.
+                    Su acceso ha sido restringido por falta de pago. Realice el depósito y envíe el comprobante a cualquiera de nuestros administradores para reactivar sus módulos.
                   </p>
                   
                   <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 text-left space-y-4">
                     <p className="text-xs font-black uppercase text-slate-400 tracking-widest border-b pb-2">Información para Pagos</p>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {paymentMethods.map(m => (
-                        <div key={m.id} className="bg-white p-4 rounded-xl border border-slate-100 flex items-start gap-3">
-                           <div className="shrink-0 p-2 bg-primary/5 rounded-lg text-primary">
+                        <div key={m.id} className="bg-white p-4 rounded-xl border border-slate-100 flex flex-col items-center text-center gap-3">
+                           <div className="p-2 bg-primary/5 rounded-lg text-primary">
                              {m.type === 'qr' ? <QrCode className="w-5 h-5" /> : <Building2 className="w-5 h-5" />}
                            </div>
-                           <div className="min-w-0">
+                           <div className="min-w-0 w-full">
                              <p className="text-[10px] font-black uppercase text-muted-foreground leading-none mb-1">{m.label}</p>
                              <p className="text-sm font-bold text-slate-900 break-all">{m.value}</p>
-                             {m.qrImage && <img src={m.qrImage} className="mt-2 w-24 h-24 object-contain mx-auto" alt="QR" />}
+                             {m.qrImage && (
+                               <div className="mt-4 p-2 bg-white border rounded-xl inline-block shadow-sm">
+                                 <img src={m.qrImage} className="w-40 h-40 object-contain mx-auto" alt="QR de Pago" />
+                                 <p className="text-[10px] font-bold text-primary mt-2 uppercase tracking-widest">Escanea para pagar</p>
+                               </div>
+                             )}
                            </div>
                         </div>
                       ))}
@@ -191,13 +196,19 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                     </div>
                   </div>
 
-                  <div className="flex flex-col sm:flex-row justify-center gap-4">
-                    <button onClick={logout} className="px-6 py-3 text-sm font-bold text-red-600 hover:bg-red-50 rounded-xl transition-colors">
+                  <div className="space-y-4">
+                    <p className="text-[10px] uppercase font-black text-muted-foreground tracking-[0.2em]">Reportar Pago vía WhatsApp</p>
+                    <div className="flex flex-col sm:flex-row justify-center gap-4">
+                      <a href="https://wa.me/51929110834" target="_blank" className="flex-1 h-14 bg-emerald-600 text-white text-xs font-black rounded-2xl hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-100 flex items-center justify-center gap-2 uppercase">
+                        <MessageCircle className="w-5 h-5" /> Reportar a Adm. 1
+                      </a>
+                      <a href="https://wa.me/51942239654" target="_blank" className="flex-1 h-14 bg-emerald-600 text-white text-xs font-black rounded-2xl hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-100 flex items-center justify-center gap-2 uppercase">
+                        <MessageCircle className="w-5 h-5" /> Reportar a Adm. 2
+                      </a>
+                    </div>
+                    <button onClick={logout} className="text-sm font-bold text-red-600 hover:bg-red-50 px-6 py-2 rounded-xl transition-colors">
                       Cerrar Sesión
                     </button>
-                    <a href="https://wa.me/51900000000" target="_blank" className="px-8 py-3 bg-emerald-600 text-white text-sm font-bold rounded-xl hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-200 flex items-center justify-center gap-2">
-                      <CheckCircle2 className="w-4 h-4" /> Enviar Comprobante
-                    </a>
                   </div>
                 </div>
               </div>
@@ -208,42 +219,49 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
         {/* Modal Pagar Aquí */}
         <Dialog open={isPayModalOpen} onOpenChange={setIsPayModalOpen}>
-          <DialogContent className="sm:max-w-xl rounded-3xl">
+          <DialogContent className="sm:max-w-2xl rounded-3xl max-h-[90vh] overflow-y-auto scrollbar-hide">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 text-2xl font-bold">
                 <Banknote className="w-6 h-6 text-emerald-600" /> Medios de Pago Autorizados
               </DialogTitle>
               <DialogDescription>
-                Utilice cualquiera de los siguientes medios para regularizar su cuenta.
+                Realice el abono y envíe la captura de pantalla a uno de nuestros números de soporte.
               </DialogDescription>
             </DialogHeader>
-            <div className="grid grid-cols-1 gap-4 py-6 max-h-[60vh] overflow-y-auto pr-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-6">
               {paymentMethods.map(m => (
-                <div key={m.id} className="p-4 rounded-2xl border bg-slate-50 flex items-center gap-5 transition-all hover:bg-white hover:shadow-md group">
-                   <div className="p-4 bg-white rounded-2xl text-primary border border-slate-100 group-hover:scale-105 transition-transform">
-                     {m.type === 'qr' ? <QrCode className="w-8 h-8" /> : <Building2 className="w-8 h-8" />}
+                <div key={m.id} className="p-4 rounded-2xl border bg-slate-50 flex flex-col items-center gap-4 transition-all hover:bg-white hover:shadow-md group">
+                   <div className="p-3 bg-white rounded-xl text-primary border border-slate-100 group-hover:scale-105 transition-transform">
+                     {m.type === 'qr' ? <QrCode className="w-6 h-6" /> : <Building2 className="w-6 h-6" />}
                    </div>
-                   <div className="flex-1 min-w-0">
-                      <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">{m.label}</p>
+                   <div className="text-center w-full">
+                      <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest leading-none mb-1">{m.label}</p>
                       <p className="text-lg font-black text-slate-800 break-all">{m.value}</p>
                       {m.qrImage && (
-                        <div className="mt-4 p-2 bg-white rounded-xl inline-block border border-slate-200">
-                          <img src={m.qrImage} className="w-32 h-32 object-contain" alt="QR" />
+                        <div className="mt-4 p-3 bg-white rounded-2xl inline-block border border-slate-200 shadow-sm">
+                          <img src={m.qrImage} className="w-48 h-48 object-contain" alt="QR Scan" />
+                          <p className="text-[9px] font-black text-primary mt-2 uppercase">Escanear QR</p>
                         </div>
                       )}
                    </div>
                 </div>
               ))}
               {paymentMethods.length === 0 && (
-                <div className="text-center py-10 text-muted-foreground">
+                <div className="col-span-full text-center py-10 text-muted-foreground">
                    <p className="text-sm italic">No se han registrado medios de pago aún.</p>
                 </div>
               )}
             </div>
-            <div className="pt-4 border-t">
-              <a href="https://wa.me/51900000000" target="_blank" className="w-full h-14 bg-emerald-600 text-white rounded-2xl font-bold flex items-center justify-center gap-3 shadow-xl shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-95">
-                 <CheckCircle2 className="w-5 h-5" /> Enviar Captura de Pago
-              </a>
+            <div className="pt-6 border-t space-y-4">
+              <p className="text-[10px] font-black text-center text-muted-foreground uppercase tracking-widest">Enviar comprobante de pago a:</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <a href="https://wa.me/51929110834" target="_blank" className="h-14 bg-emerald-600 text-white rounded-2xl font-black text-xs flex items-center justify-center gap-3 shadow-xl shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-95 uppercase">
+                   <MessageCircle className="w-5 h-5" /> WhatsApp Adm. 1
+                </a>
+                <a href="https://wa.me/51942239654" target="_blank" className="h-14 bg-emerald-600 text-white rounded-2xl font-black text-xs flex items-center justify-center gap-3 shadow-xl shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-95 uppercase">
+                   <MessageCircle className="w-5 h-5" /> WhatsApp Adm. 2
+                </a>
+              </div>
             </div>
           </DialogContent>
         </Dialog>
