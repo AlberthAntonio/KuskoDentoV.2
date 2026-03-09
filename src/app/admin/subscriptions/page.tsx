@@ -113,6 +113,7 @@ function SubscriptionsContent() {
                       </TableCell>
                       <TableCell>
                         <Badge 
+                          variant={status === 'active' ? 'default' : status === 'overdue' ? 'secondary' : 'destructive'} 
                           className={cn(
                             "text-[9px] h-5 font-bold",
                             status === 'active' && "bg-emerald-500",

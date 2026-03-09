@@ -14,6 +14,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// ÚNICAS CUENTAS ADMINISTRATIVAS PERMITIDAS EN TODO EL SISTEMA
 const MASTER_ADMINS = [
   { username: 'admin1', password: 'KuskoAdmin01*', fullName: 'Administrador 1' },
   { username: 'admin2', password: 'KuskoAdmin02*', fullName: 'Administrador 2' }
@@ -42,12 +43,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = async (username: string, password: string) => {
-    const users = await db.getAll<User>('users');
-    let authenticatedUser: User | null = null;
-    
-    // 1. Verificar si es una de las dos cuentas maestras
+    // 1. Bloqueo explícito de cualquier intento con el usuario 'superadmin'
+    if (username.toLowerCase() === 'superadmin') {
+      return { success: false, message: 'Acceso Denegado: Usuario no autorizado.' };
+    }
+
+    // 2. Verificar si es una de las dos cuentas maestras (admin1 o admin2)
     const masterMatch = MASTER_ADMINS.find(ma => ma.username === username && ma.password === password);
     
+    let authenticatedUser: User | null = null;
+
     if (masterMatch) {
       authenticatedUser = { 
         id: `admin-${username}`, 
@@ -59,12 +64,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         lastLogin: new Date().toISOString(),
         subscriptionStatus: 'active'
       };
+      // Sincronizar con BD para asegurar persistencia de datos
       await db.put('users', authenticatedUser);
     } 
-    // 2. Verificar en la base de datos local (Consultorios y Personal)
+    // 3. Verificar en la base de datos local (Consultorios y Personal)
     else {
-      const foundUser = users.find(u => u.username === username && u.password === password);
+      const allUsers = await db.getAll<User>('users');
+      const foundUser = allUsers.find(u => u.username === username && u.password === password);
+      
       if (foundUser) {
+        // SEGURIDAD: Impedir que un usuario de la BD acceda si tiene rol 'admin' pero no es master
+        // También bloquea si de alguna forma quedó un 'superadmin' en BD
+        if (foundUser.role === 'admin' || (foundUser.role as any) === 'superadmin') {
+          return { success: false, message: 'Acceso Denegado: Credenciales administrativas no autorizadas.' };
+        }
+
         if (foundUser.subscriptionStatus === 'blocked') {
           return { success: false, message: 'Cuenta Bloqueada. Comuníquese con el administrador.' };
         }
