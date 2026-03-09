@@ -48,7 +48,7 @@ function UsersContent() {
   }, [currentUser]);
 
   useEffect(() => {
-    if (currentUser?.role === 'superadmin' && form.contractStartDate && !editingId) {
+    if (currentUser?.role === 'admin' && form.contractStartDate && !editingId) {
       const installments = parseInt(form.advanceInstallments) || 1;
       const start = parseISO(form.contractStartDate);
       const next = addMonths(start, installments);
@@ -60,7 +60,7 @@ function UsersContent() {
     if (!currentUser) return;
     const all = await db.getAll<User>('users');
     
-    if (currentUser.role === 'superadmin') {
+    if (currentUser.role === 'admin') {
       setUsers(all.filter(u => u.role === 'clinic'));
     } 
     else if (currentUser.role === 'clinic') {
@@ -75,10 +75,8 @@ function UsersContent() {
     }
 
     setIsValidatingDni(true);
-    // Simulación de consulta a RENIEC
     setTimeout(() => {
       setIsValidatingDni(false);
-      // Datos de ejemplo para la simulación
       const simulatedData: Record<string, string> = {
         "12345678": "CONSULTORIO DENTAL CUSCO S.A.C.",
         "87654321": "DR. RICARDO PALMA ZEGARRA",
@@ -107,7 +105,7 @@ function UsersContent() {
     e.preventDefault();
     if (!currentUser) return;
 
-    const isCreatingClinic = currentUser.role === 'superadmin';
+    const isCreatingClinic = currentUser.role === 'admin';
 
     const newUser: User = {
       id: editingId || crypto.randomUUID(),
@@ -126,8 +124,7 @@ function UsersContent() {
       contractStartDate: isCreatingClinic ? form.contractStartDate : undefined,
       paymentFrequency: 'monthly',
       subscriptionStatus: form.subscriptionStatus,
-      // Almacenar qué administrador está registrando el consultorio
-      registeredByAdminId: (isCreatingClinic && !editingId) ? currentUser.id : (users.find(u => u.id === editingId)?.registeredByAdminId)
+      registeredByAdminId: (isCreatingClinic && !editingId) ? currentUser.username : (users.find(u => u.id === editingId)?.registeredByAdminId)
     };
 
     await db.put('users', newUser);
@@ -143,7 +140,7 @@ function UsersContent() {
         amount: totalAmount,
         date: new Date().toISOString().split('T')[0],
         concept: `Pago inicial: ${installments} cuota(s) mensuales adelantadas`,
-        processedByAdminId: currentUser.id
+        processedByAdminId: currentUser.username
       });
     }
 
@@ -203,7 +200,7 @@ function UsersContent() {
 
   if (!currentUser) return null;
 
-  const isSuperAdmin = currentUser.role === 'superadmin';
+  const isAdmin = currentUser.role === 'admin';
   const totalInformational = (parseFloat(form.subscriptionFee) || 0) * (parseInt(form.advanceInstallments) || 1);
   const installmentOptions = Array.from({ length: 24 }, (_, i) => i + 1);
 
@@ -213,10 +210,10 @@ function UsersContent() {
         <div className="flex justify-between items-center">
           <div>
             <h2 className="text-3xl font-bold text-primary">
-              {isSuperAdmin ? 'Gestión de Consultorios' : 'Gestión de Personal'}
+              {isAdmin ? 'Gestión de Consultorios' : 'Gestión de Personal'}
             </h2>
             <p className="text-muted-foreground mt-1">
-              {isSuperAdmin 
+              {isAdmin 
                 ? 'Panel de control de acceso y suscripciones' 
                 : 'Administra el personal clínico de tu consultorio'}
             </p>
@@ -228,14 +225,14 @@ function UsersContent() {
             <DialogTrigger asChild>
               <Button className="gap-2 h-12 px-6 shadow-lg shadow-primary/20">
                 <UserPlus className="w-5 h-5" />
-                {isSuperAdmin ? 'Nuevo Consultorio' : 'Nuevo Personal'}
+                {isAdmin ? 'Nuevo Consultorio' : 'Nuevo Personal'}
               </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto rounded-3xl">
               <DialogHeader>
                 <DialogTitle className="text-2xl font-bold flex items-center gap-3">
                   <Building2 className="text-primary w-8 h-8" />
-                  {editingId ? 'Editar Registro' : isSuperAdmin ? 'Registrar Nuevo Consultorio' : 'Registrar Personal'}
+                  {editingId ? 'Editar Registro' : isAdmin ? 'Registrar Nuevo Consultorio' : 'Registrar Personal'}
                 </DialogTitle>
                 <DialogDescription>
                   Complete la ficha técnica del establecimiento o personal (Estándar regional DD/MM/AAAA)
@@ -247,7 +244,7 @@ function UsersContent() {
                     <Avatar className="w-28 h-28 border-4 border-primary/10 shadow-xl">
                       <AvatarImage src={photoPreview || ''} />
                       <AvatarFallback className="bg-primary/5 text-primary text-3xl">
-                        {isSuperAdmin ? <Building2 className="w-12 h-12" /> : <UserIcon className="w-12 h-12" />}
+                        {isAdmin ? <Building2 className="w-12 h-12" /> : <UserIcon className="w-12 h-12" />}
                       </AvatarFallback>
                     </Avatar>
                     <label className="absolute bottom-1 right-1 p-2.5 bg-primary rounded-full text-white cursor-pointer hover:bg-primary/90 transition-all shadow-lg hover:scale-110 active:scale-95">
@@ -258,7 +255,6 @@ function UsersContent() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Validación DNI - RENIEC */}
                   <div className="space-y-2 col-span-1">
                     <Label htmlFor="dni" className="font-bold flex items-center gap-2">
                       DNI / RUC del Titular
@@ -283,20 +279,20 @@ function UsersContent() {
 
                   <div className="space-y-2 col-span-1">
                     <Label htmlFor="fullName" className="font-bold">
-                      {isSuperAdmin ? 'Nombre Comercial del Consultorio' : 'Nombre Completo'}
+                      {isAdmin ? 'Nombre Comercial del Consultorio' : 'Nombre Completo'}
                     </Label>
                     <Input id="fullName" value={form.fullName} onChange={e => setForm({...form, fullName: e.target.value})} required className="h-11" placeholder="Se completará al validar DNI" />
                   </div>
                   
-                  {isSuperAdmin && (
+                  {isAdmin && (
                     <>
                       <div className="space-y-2">
                         <Label htmlFor="username" className="font-bold">Usuario de Acceso</Label>
-                        <Input id="username" value={form.username} onChange={e => setForm({...form, username: e.target.value})} required={isSuperAdmin} className="h-11" />
+                        <Input id="username" value={form.username} onChange={e => setForm({...form, username: e.target.value})} required={isAdmin} className="h-11" />
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="password" className="font-bold">Contraseña de Seguridad</Label>
-                        <Input id="password" type="password" value={form.password} onChange={e => setForm({...form, password: e.target.value})} required={isSuperAdmin} className="h-11" />
+                        <Input id="password" type="password" value={form.password} onChange={e => setForm({...form, password: e.target.value})} required={isAdmin} className="h-11" />
                       </div>
 
                       <div className="col-span-full border-t border-dashed pt-6">
@@ -372,7 +368,7 @@ function UsersContent() {
                     </>
                   )}
 
-                  {!isSuperAdmin && (
+                  {!isAdmin && (
                     <div className="space-y-2 col-span-full">
                       <Label htmlFor="role" className="font-bold">Cargo / Función Clínica</Label>
                       <Select value={form.role} onValueChange={(v: any) => setForm({...form, role: v})}>
@@ -392,7 +388,7 @@ function UsersContent() {
                     <Label htmlFor="colegiatura" className="font-bold">N° Colegiatura / Registro Profesional</Label>
                     <div className="relative">
                       <Stethoscope className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
-                      <Input id="colegiatura" value={form.colegiatura} onChange={e => setForm({...form, colegiatura: e.target.value})} required={!isSuperAdmin && form.role === 'doctor'} className="pl-10 h-11" placeholder="Ej: COP 12345" />
+                      <Input id="colegiatura" value={form.colegiatura} onChange={e => setForm({...form, colegiatura: e.target.value})} required={!isAdmin && form.role === 'doctor'} className="pl-10 h-11" placeholder="Ej: COP 12345" />
                     </div>
                   </div>
 
@@ -437,15 +433,15 @@ function UsersContent() {
                        u.role === 'assistant' ? 'Asistente' : 'Técnico'
                      }
                    </CardDescription>
-                   {isSuperAdmin && u.registeredByAdminId && (
+                   {isAdmin && u.registeredByAdminId && (
                      <p className="text-[9px] font-bold text-muted-foreground mt-1 flex items-center gap-1">
-                       <Shield className="w-2 h-2" /> Por: {u.registeredByAdminId.replace('su-admin-', '')}
+                       <Shield className="w-2 h-2" /> Por: {u.registeredByAdminId}
                      </p>
                    )}
                  </div>
                </CardHeader>
                <CardContent className="space-y-4">
-                 {isSuperAdmin && (
+                 {isAdmin && (
                    <div className="bg-slate-50 p-4 rounded-2xl text-[10px] space-y-3 border border-slate-100">
                       <div className="flex justify-between items-center">
                         <span className="font-bold text-muted-foreground uppercase">Estado:</span> 

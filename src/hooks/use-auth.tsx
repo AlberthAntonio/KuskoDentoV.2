@@ -14,9 +14,9 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const MASTER_SUPERADMINS = [
-  { username: 'admin1', password: 'KuskoAdmin01*', fullName: 'Súper Administrador Principal' },
-  { username: 'admin2', password: 'KuskoAdmin02*', fullName: 'Súper Administrador Secundario' }
+const MASTER_ADMINS = [
+  { username: 'admin1', password: 'KuskoAdmin01*', fullName: 'Administrador 1' },
+  { username: 'admin2', password: 'KuskoAdmin02*', fullName: 'Administrador 2' }
 ];
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -41,7 +41,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const users = await db.getAll<User>('users');
     let authenticatedUser: User | null = null;
     
-    // 1. Verificar primero en la base de datos local (por si cambiaron la contraseña)
+    // 1. Verificar en la base de datos local
     const foundUser = users.find(u => u.username === username && u.password === password);
     if (foundUser) {
       if (foundUser.subscriptionStatus === 'blocked') {
@@ -50,27 +50,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       authenticatedUser = { ...foundUser, status: 'active', lastLogin: new Date().toISOString() };
       await db.put('users', authenticatedUser);
     }
-    // 2. Si no coincide en la DB, verificar con las maestras (fallback)
+    // 2. Fallback a credenciales maestras si no existe en DB
     else {
-      const masterMatch = MASTER_SUPERADMINS.find(ma => ma.username === username && ma.password === password);
+      const masterMatch = MASTER_ADMINS.find(ma => ma.username === username && ma.password === password);
       if (masterMatch) {
-        const existingSuper = users.find(u => u.username === username);
-        if (!existingSuper) {
-          authenticatedUser = { 
-            id: `su-admin-${username}`, 
-            username: masterMatch.username, 
-            password: masterMatch.password,
-            role: 'superadmin',
-            fullName: masterMatch.fullName,
-            status: 'active',
-            lastLogin: new Date().toISOString(),
-            subscriptionStatus: 'active'
-          };
-          await db.put('users', authenticatedUser);
-        } else {
-          authenticatedUser = { ...existingSuper, status: 'active', lastLogin: new Date().toISOString() };
-          await db.put('users', authenticatedUser);
-        }
+        authenticatedUser = { 
+          id: `admin-${username}`, 
+          username: masterMatch.username, 
+          password: masterMatch.password,
+          role: 'admin',
+          fullName: masterMatch.fullName,
+          status: 'active',
+          lastLogin: new Date().toISOString(),
+          subscriptionStatus: 'active'
+        };
+        await db.put('users', authenticatedUser);
       }
     }
 

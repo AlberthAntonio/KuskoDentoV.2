@@ -45,7 +45,7 @@ function SubscriptionsContent() {
     (c.dni || '').includes(search)
   );
 
-  if (currentUser?.role !== 'superadmin') return null;
+  if (currentUser?.role !== 'admin') return null;
 
   return (
     <AppLayout>

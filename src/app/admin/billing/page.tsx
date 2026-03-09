@@ -80,7 +80,7 @@ function BillingContent() {
 
   const handleRegisterPayment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedClinic) return;
+    if (!selectedClinic || !currentUser) return;
 
     const payment: SubscriptionPayment = {
       id: crypto.randomUUID(),
@@ -88,7 +88,8 @@ function BillingContent() {
       clinicName: selectedClinic.fullName || selectedClinic.username || 'Clínica',
       amount: parseFloat(payAmount),
       date: new Date().toISOString().split('T')[0],
-      concept: `Renovación: ${installments} cuota(s) mensuales. Próximo vencimiento: ${format(parseISO(nextDate), 'dd/MM/yyyy')}`
+      concept: `Renovación: ${installments} cuota(s) mensuales. Próximo vencimiento: ${format(parseISO(nextDate), 'dd/MM/yyyy')}`,
+      processedByAdminId: currentUser.username
     };
 
     await db.put('subscription_payments', payment);
@@ -114,7 +115,7 @@ function BillingContent() {
     (c.dni || '').includes(search)
   );
 
-  if (currentUser?.role !== 'superadmin') return null;
+  if (currentUser?.role !== 'admin') return null;
 
   return (
     <AppLayout>
@@ -244,6 +245,9 @@ function BillingContent() {
                       <div className="min-w-0">
                         <p className="font-bold text-xs truncate text-slate-900">{h.clinicName}</p>
                         <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight">{h.concept}</p>
+                        {h.processedByAdminId && (
+                          <p className="text-[8px] font-bold text-muted-foreground uppercase">Por: {h.processedByAdminId}</p>
+                        )}
                       </div>
                     </div>
                     <div className="text-right shrink-0">

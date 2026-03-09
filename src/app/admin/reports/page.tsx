@@ -33,7 +33,6 @@ function ReportsContent() {
     const appointments = await db.getAll<Appointment>('appointments');
     const payments = await db.getAll<Payment>('payments');
 
-    // Datos simulados por mes para el gráfico de crecimiento
     const growth = [
       { name: 'Ene', value: 10 },
       { name: 'Feb', value: 25 },
@@ -43,7 +42,6 @@ function ReportsContent() {
       { name: 'Jun', value: clinics.length * 10 }
     ];
 
-    // Distribución de pacientes por consultorio (Top 5)
     const distribution = clinics.map(c => ({
       name: c.fullName || c.username,
       patients: patients.filter(p => p.clinicId === c.id).length
@@ -61,7 +59,7 @@ function ReportsContent() {
     });
   };
 
-  if (user?.role !== 'superadmin') return null;
+  if (user?.role !== 'admin') return null;
 
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 

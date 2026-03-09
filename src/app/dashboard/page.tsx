@@ -5,14 +5,14 @@ import { useEffect, useState } from 'react';
 import { AuthProvider, useAuth } from '@/hooks/use-auth';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { Users, UserSquare2, Stethoscope, Landmark, Activity, Calendar, Database, ShieldCheck, BarChart3, Clock, AlertCircle } from 'lucide-react';
+import { Users, UserSquare2, Stethoscope, Landmark, Activity, Calendar, Database, Database as DatabaseIcon, ShieldCheck, BarChart3, Clock, AlertCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { db, User, Patient, Appointment } from '@/lib/db';
 import Link from 'next/link';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
 
-function SuperAdminDashboard() {
+function AdminDashboard() {
   const [stats, setStats] = useState({
     totalClinics: 0,
     activeClinics: 0,
@@ -52,7 +52,7 @@ function SuperAdminDashboard() {
   return (
     <div className="space-y-8">
       <div>
-        <h2 className="text-3xl font-bold text-primary">Panel Administrativo Global</h2>
+        <h2 className="text-3xl font-bold text-primary">Panel Administrativo</h2>
         <p className="text-muted-foreground mt-2">Monitoreo de red de consultorios dentales</p>
       </div>
 
@@ -123,7 +123,7 @@ function SuperAdminDashboard() {
               <div key={clinic.id} className="flex items-center justify-between p-3 border rounded-lg">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
-                    {clinic.fullName?.charAt(0) || clinic.username.charAt(0)}
+                    {clinic.fullName?.charAt(0) || clinic.username?.charAt(0)}
                   </div>
                   <div>
                     <p className="font-bold text-sm">{clinic.fullName || clinic.username}</p>
@@ -153,7 +153,7 @@ function ClinicDashboard() {
     { icon: Activity, title: 'Odontograma', description: 'Esquema gráfico interactivo', href: '/odontogram', color: 'bg-indigo-500' },
     { icon: Calendar, title: 'Citas', description: 'Agenda de pacientes', href: '/appointments', color: 'bg-violet-500' },
     { icon: Users, title: 'Personal', description: 'Administración de acceso', href: '/admin/users', color: 'bg-slate-500' },
-    { icon: Database, title: 'Respaldo', description: 'Backup y restauración', href: '/backups', color: 'bg-amber-500' },
+    { icon: DatabaseIcon, title: 'Respaldo', description: 'Backup y restauración', href: '/backups', color: 'bg-amber-500' },
   ];
 
   return (
@@ -190,7 +190,7 @@ function DashboardContent() {
   if (!user) return null;
   return (
     <AppLayout>
-      {user.role === 'superadmin' ? <SuperAdminDashboard /> : <ClinicDashboard />}
+      {user.role === 'admin' ? <AdminDashboard /> : <ClinicDashboard />}
     </AppLayout>
   );
 }

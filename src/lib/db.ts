@@ -4,7 +4,7 @@
 const DB_NAME = "KuskoDentoDB";
 const DB_VERSION = 7;
 
-export type UserRole = 'superadmin' | 'clinic' | 'doctor' | 'assistant' | 'technician';
+export type UserRole = 'admin' | 'clinic' | 'doctor' | 'assistant' | 'technician';
 
 export interface User {
   id: string;

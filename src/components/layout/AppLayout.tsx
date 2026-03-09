@@ -17,7 +17,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   if (!user) return null;
 
-  const isSuperAdmin = user.role === 'superadmin';
+  const isAdmin = user.role === 'admin';
   const isClinic = user.role === 'clinic';
   
   const getCalculatedStatus = () => {
@@ -40,20 +40,20 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   const menuItems = [
     { icon: LayoutDashboard, label: 'Panel Principal', href: '/dashboard', show: true },
-    { icon: BarChart3, label: 'Reportes', href: '/admin/reports', show: isSuperAdmin },
-    { icon: CreditCard, label: 'Suscripciones', href: '/admin/subscriptions', show: isSuperAdmin },
-    { icon: Banknote, label: 'Pagos', href: '/admin/billing', show: isSuperAdmin },
-    { icon: isSuperAdmin ? ShieldCheck : Users, label: isSuperAdmin ? 'Consultorios' : 'Personal', href: '/admin/users', show: (isSuperAdmin || isClinic) && !isSuspended },
-    { icon: UserSquare2, label: 'Pacientes', href: '/patients', show: !isSuperAdmin && !isSuspended },
-    { icon: Stethoscope, label: 'Tratamientos', href: '/treatments', show: !isSuperAdmin && !isSuspended },
-    { icon: Landmark, label: 'Pagos Pacientes', href: '/payments', show: !isSuperAdmin && !isSuspended },
-    { icon: Activity, label: 'Odontograma', href: '/odontogram', show: !isSuperAdmin && !isSuspended },
-    { icon: Calendar, label: 'Citas', href: '/appointments', show: !isSuperAdmin && !isSuspended },
-    { icon: Database, label: 'Copia de Seguridad', href: '/backups', show: (isSuperAdmin || isClinic) && !isSuspended },
+    { icon: BarChart3, label: 'Reportes', href: '/admin/reports', show: isAdmin },
+    { icon: CreditCard, label: 'Suscripciones', href: '/admin/subscriptions', show: isAdmin },
+    { icon: Banknote, label: 'Pagos', href: '/admin/billing', show: isAdmin },
+    { icon: isAdmin ? ShieldCheck : Users, label: isAdmin ? 'Consultorios' : 'Personal', href: '/admin/users', show: (isAdmin || isClinic) && !isSuspended },
+    { icon: UserSquare2, label: 'Pacientes', href: '/patients', show: !isAdmin && !isSuspended },
+    { icon: Stethoscope, label: 'Tratamientos', href: '/treatments', show: !isAdmin && !isSuspended },
+    { icon: Landmark, label: 'Pagos Pacientes', href: '/payments', show: !isAdmin && !isSuspended },
+    { icon: Activity, label: 'Odontograma', href: '/odontogram', show: !isAdmin && !isSuspended },
+    { icon: Calendar, label: 'Citas', href: '/appointments', show: !isAdmin && !isSuspended },
+    { icon: Database, label: 'Copia de Seguridad', href: '/backups', show: (isAdmin || isClinic) && !isSuspended },
     { icon: UserIcon, label: 'Mi Perfil', href: '/profile', show: true },
   ];
 
-  if (isBlocked && !isSuperAdmin) {
+  if (isBlocked && !isAdmin) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center p-6">
         <div className="max-w-md w-full bg-white rounded-3xl shadow-2xl overflow-hidden p-8 text-center space-y-6">
@@ -127,7 +127,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
             <SidebarTrigger />
             <div className="flex-1 flex justify-center">
-              {isOverdue && !isSuperAdmin && !isSuspended && (
+              {isOverdue && !isAdmin && !isSuspended && (
                 <div className="bg-amber-100 border border-amber-300 text-amber-900 px-4 py-1.5 rounded-full flex items-center gap-2">
                   <AlertTriangle className="w-4 h-4 text-amber-600" />
                   <span className="text-xs font-bold uppercase tracking-tight">Aviso: Pago vencido. Periodo de gracia activo.</span>
@@ -145,7 +145,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             </div>
           </header>
           <main className="flex-1 overflow-auto p-8 relative">
-            {isSuspended && !isSuperAdmin && (
+            {isSuspended && !isAdmin && (
               <div className="absolute inset-0 bg-white/60 backdrop-blur-[2px] z-[100] flex items-center justify-center p-8 text-center">
                 <div className="max-w-xl w-full bg-white border-2 border-amber-200 rounded-3xl shadow-2xl p-10 space-y-6">
                   <div className="w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto">
