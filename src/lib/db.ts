@@ -2,7 +2,7 @@
 "use client";
 
 const DB_NAME = "KuskoDentoDB";
-const DB_VERSION = 7;
+const DB_VERSION = 8;
 
 export type UserRole = 'admin' | 'clinic' | 'doctor' | 'assistant' | 'technician';
 
@@ -19,13 +19,11 @@ export interface User {
   clinicId?: string; 
   lastLogin?: string;
   status?: 'active' | 'inactive';
-  // Campos de suscripción y estado de cuenta
   subscriptionFee?: number;
   nextPaymentDate?: string;
   contractStartDate?: string;
   paymentFrequency?: 'monthly' | 'yearly';
   subscriptionStatus: 'active' | 'suspended' | 'blocked';
-  // Trazabilidad administrativa
   registeredByAdminId?: string;
 }
 
@@ -136,6 +134,14 @@ export interface SubscriptionPayment {
   processedByAdminId?: string;
 }
 
+export interface PaymentMethod {
+  id: string;
+  type: 'qr' | 'bank';
+  label: string;
+  value: string;
+  qrImage?: string;
+}
+
 export class LocalDB {
   private db: IDBDatabase | null = null;
 
@@ -150,7 +156,8 @@ export class LocalDB {
         
         const stores = [
           'users', 'patients', 'treatments', 'patient_treatments', 'appointments', 
-          'payments', 'radiographs', 'consents', 'odontograms', 'subscription_payments'
+          'payments', 'radiographs', 'consents', 'odontograms', 'subscription_payments',
+          'payment_methods'
         ];
 
         stores.forEach(store => {
@@ -221,7 +228,7 @@ export class LocalDB {
 
   async exportData(): Promise<string> {
     await this.init();
-    const stores = ['users', 'patients', 'treatments', 'patient_treatments', 'appointments', 'payments', 'radiographs', 'consents', 'odontograms', 'subscription_payments'];
+    const stores = ['users', 'patients', 'treatments', 'patient_treatments', 'appointments', 'payments', 'radiographs', 'consents', 'odontograms', 'subscription_payments', 'payment_methods'];
     const data: any = {};
 
     for (const store of stores) {

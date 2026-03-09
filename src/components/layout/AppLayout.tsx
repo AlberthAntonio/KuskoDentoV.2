@@ -1,19 +1,30 @@
 
 "use client";
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { SidebarProvider, Sidebar, SidebarContent, SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarTrigger, SidebarInset } from '@/components/ui/sidebar';
-import { Users, UserSquare2, Stethoscope, Landmark, Activity, Calendar, Database, LogOut, LayoutDashboard, ShieldCheck, BarChart3, CreditCard, AlertTriangle, QrCode, Building2, ShieldAlert, Banknote, User as UserIcon } from 'lucide-react';
+import { Users, UserSquare2, Stethoscope, Landmark, Activity, Calendar, Database, LogOut, LayoutDashboard, ShieldCheck, BarChart3, CreditCard, AlertTriangle, QrCode, Building2, ShieldAlert, Banknote, User as UserIcon, X, CheckCircle2 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { format, isAfter, parseISO, addDays } from 'date-fns';
+import { db, PaymentMethod } from '@/lib/db';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
   const pathname = usePathname();
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+  const [isPayModalOpen, setIsPayModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (user && user.role === 'clinic') {
+      db.getAll<PaymentMethod>('payment_methods').then(setPaymentMethods);
+    }
+  }, [user]);
 
   if (!user) return null;
 
@@ -23,13 +34,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const getCalculatedStatus = () => {
     if (user.subscriptionStatus === 'blocked') return 'blocked';
     if (!user.nextPaymentDate) return 'active';
-    
     const next = parseISO(user.nextPaymentDate);
     const today = new Date();
-    
     if (isAfter(today, addDays(next, 10))) return 'suspended';
     if (isAfter(today, next)) return 'overdue';
-    
     return 'active';
   };
 
@@ -114,6 +122,11 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                     Vence: {format(parseISO(user.nextPaymentDate), 'dd/MM/yyyy')}
                   </p>
                 )}
+                {(isOverdue || isSuspended) && (
+                  <Button variant="outline" size="sm" className="w-full mt-2 h-8 text-[10px] font-bold border-primary text-primary hover:bg-primary/5" onClick={() => setIsPayModalOpen(true)}>
+                    PAGAR AQUÍ
+                  </Button>
+                )}
               </div>
             )}
             <button 
@@ -130,9 +143,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             <SidebarTrigger />
             <div className="flex-1 flex justify-center">
               {isOverdue && !isAdmin && !isSuspended && (
-                <div className="bg-amber-100 border border-amber-300 text-amber-900 px-4 py-1.5 rounded-full flex items-center gap-2">
+                <div className="bg-amber-100 border border-amber-300 text-amber-900 px-4 py-1.5 rounded-full flex items-center gap-3">
                   <AlertTriangle className="w-4 h-4 text-amber-600" />
-                  <span className="text-xs font-bold uppercase tracking-tight">Aviso: Pago vencido. Periodo de gracia activo.</span>
+                  <span className="text-xs font-bold uppercase tracking-tight">Periodo de gracia activo. Regularice su pago.</span>
+                  <Button variant="ghost" size="sm" className="h-6 text-[10px] font-black underline p-0 hover:bg-transparent" onClick={() => setIsPayModalOpen(true)}>PAGAR AQUÍ</Button>
                 </div>
               )}
             </div>
@@ -148,33 +162,41 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           </header>
           <main className="flex-1 overflow-auto p-8 relative">
             {isSuspended && !isAdmin && (
-              <div className="absolute inset-0 bg-white/60 backdrop-blur-[2px] z-[100] flex items-center justify-center p-8 text-center">
-                <div className="max-w-xl w-full bg-white border-2 border-amber-200 rounded-3xl shadow-2xl p-10 space-y-6">
+              <div className="absolute inset-0 bg-white/80 backdrop-blur-[4px] z-[100] flex items-center justify-center p-8 text-center">
+                <div className="max-w-2xl w-full bg-white border-2 border-amber-200 rounded-3xl shadow-2xl p-10 space-y-6 overflow-y-auto max-h-full">
                   <div className="w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto">
                     <AlertTriangle className="w-10 h-10" />
                   </div>
-                  <h3 className="text-2xl font-bold text-slate-900">Cuenta suspendida por falta de pago</h3>
-                  <p className="text-slate-600 leading-relaxed">
-                    Para reactivar el servicio debe realizar el pago vía **Yape** y enviar la captura al WhatsApp del administrador o comunicarse directamente.
+                  <h3 className="text-2xl font-bold text-slate-900 uppercase">Servicio Suspendido</h3>
+                  <p className="text-slate-600 leading-relaxed font-medium">
+                    Su acceso ha sido restringido por falta de pago. Realice el depósito y envíe el comprobante para reactivar sus módulos.
                   </p>
                   
-                  <div className="grid grid-cols-2 gap-4 py-4">
-                    <div className="border rounded-2xl p-4 flex flex-col items-center gap-2 bg-slate-50">
-                      <QrCode className="w-10 h-10 text-primary" />
-                      <p className="text-[10px] font-bold uppercase text-muted-foreground">Yape / Plin</p>
-                    </div>
-                    <div className="border rounded-2xl p-4 flex flex-col items-center gap-2 bg-slate-50">
-                      <Building2 className="w-10 h-10 text-primary" />
-                      <p className="text-[10px] font-bold uppercase text-muted-foreground">Banco / CCI</p>
+                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 text-left space-y-4">
+                    <p className="text-xs font-black uppercase text-slate-400 tracking-widest border-b pb-2">Información para Pagos</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {paymentMethods.map(m => (
+                        <div key={m.id} className="bg-white p-4 rounded-xl border border-slate-100 flex items-start gap-3">
+                           <div className="shrink-0 p-2 bg-primary/5 rounded-lg text-primary">
+                             {m.type === 'qr' ? <QrCode className="w-5 h-5" /> : <Building2 className="w-5 h-5" />}
+                           </div>
+                           <div className="min-w-0">
+                             <p className="text-[10px] font-black uppercase text-muted-foreground leading-none mb-1">{m.label}</p>
+                             <p className="text-sm font-bold text-slate-900 break-all">{m.value}</p>
+                             {m.qrImage && <img src={m.qrImage} className="mt-2 w-24 h-24 object-contain mx-auto" alt="QR" />}
+                           </div>
+                        </div>
+                      ))}
+                      {paymentMethods.length === 0 && <p className="col-span-full text-xs text-center text-muted-foreground italic py-4">Consulte los medios de pago con el administrador.</p>}
                     </div>
                   </div>
 
-                  <div className="flex justify-center gap-4">
-                    <button onClick={logout} className="px-6 py-2.5 text-sm font-bold text-red-600 hover:bg-red-50 rounded-lg transition-colors">
-                      Salir del Sistema
+                  <div className="flex flex-col sm:flex-row justify-center gap-4">
+                    <button onClick={logout} className="px-6 py-3 text-sm font-bold text-red-600 hover:bg-red-50 rounded-xl transition-colors">
+                      Cerrar Sesión
                     </button>
-                    <a href="https://wa.me/51900000000" target="_blank" className="px-6 py-2.5 bg-emerald-600 text-white text-sm font-bold rounded-lg hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-200">
-                      Contactar por WhatsApp
+                    <a href="https://wa.me/51900000000" target="_blank" className="px-8 py-3 bg-emerald-600 text-white text-sm font-bold rounded-xl hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-200 flex items-center justify-center gap-2">
+                      <CheckCircle2 className="w-4 h-4" /> Enviar Comprobante
                     </a>
                   </div>
                 </div>
@@ -183,6 +205,48 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             {children}
           </main>
         </SidebarInset>
+
+        {/* Modal Pagar Aquí */}
+        <Dialog open={isPayModalOpen} onOpenChange={setIsPayModalOpen}>
+          <DialogContent className="sm:max-w-xl rounded-3xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-2xl font-bold">
+                <Banknote className="w-6 h-6 text-emerald-600" /> Medios de Pago Autorizados
+              </DialogTitle>
+              <DialogDescription>
+                Utilice cualquiera de los siguientes medios para regularizar su cuenta.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid grid-cols-1 gap-4 py-6 max-h-[60vh] overflow-y-auto pr-2">
+              {paymentMethods.map(m => (
+                <div key={m.id} className="p-4 rounded-2xl border bg-slate-50 flex items-center gap-5 transition-all hover:bg-white hover:shadow-md group">
+                   <div className="p-4 bg-white rounded-2xl text-primary border border-slate-100 group-hover:scale-105 transition-transform">
+                     {m.type === 'qr' ? <QrCode className="w-8 h-8" /> : <Building2 className="w-8 h-8" />}
+                   </div>
+                   <div className="flex-1 min-w-0">
+                      <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">{m.label}</p>
+                      <p className="text-lg font-black text-slate-800 break-all">{m.value}</p>
+                      {m.qrImage && (
+                        <div className="mt-4 p-2 bg-white rounded-xl inline-block border border-slate-200">
+                          <img src={m.qrImage} className="w-32 h-32 object-contain" alt="QR" />
+                        </div>
+                      )}
+                   </div>
+                </div>
+              ))}
+              {paymentMethods.length === 0 && (
+                <div className="text-center py-10 text-muted-foreground">
+                   <p className="text-sm italic">No se han registrado medios de pago aún.</p>
+                </div>
+              )}
+            </div>
+            <div className="pt-4 border-t">
+              <a href="https://wa.me/51900000000" target="_blank" className="w-full h-14 bg-emerald-600 text-white rounded-2xl font-bold flex items-center justify-center gap-3 shadow-xl shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-95">
+                 <CheckCircle2 className="w-5 h-5" /> Enviar Captura de Pago
+              </a>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </SidebarProvider>
   );
