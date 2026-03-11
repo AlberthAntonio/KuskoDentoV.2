@@ -11,6 +11,7 @@ interface AuthContextType {
   logout: () => void;
   updateUser: (updatedUser: User) => void;
   isLoading: boolean;
+  lockoutUntil: number;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -20,9 +21,13 @@ const MASTER_ADMINS = [
   { username: 'admin2', password: 'admin2', fullName: 'Administrador 2' }
 ];
 
+const MAX_ATTEMPTS = 3;
+const LOCKOUT_MS = 2 * 60 * 1000; // 2 minutos
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [lockoutUntil, setLockoutUntil] = useState<number>(0);
   const router = useRouter();
 
   useEffect(() => {
@@ -30,24 +35,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (session) {
       try {
         const parsed = JSON.parse(session);
-        if (parsed.role === 'superadmin') {
-          parsed.role = 'admin';
-        }
         setUser(parsed);
       } catch (e) {
         localStorage.removeItem('kd_session');
       }
     }
+
+    const storedLockout = localStorage.getItem('kd_lockout_until');
+    if (storedLockout) {
+      const until = parseInt(storedLockout);
+      if (until > Date.now()) {
+        setLockoutUntil(until);
+      } else {
+        localStorage.removeItem('kd_lockout_until');
+        localStorage.removeItem('kd_failed_attempts');
+      }
+    }
+
     setIsLoading(false);
   }, []);
 
   const login = async (username: string, password: string) => {
+    // Verificar si el sistema está bloqueado
+    const now = Date.now();
+    if (now < lockoutUntil) {
+      const remaining = Math.ceil((lockoutUntil - now) / 1000);
+      return { 
+        success: false, 
+        message: `Sistema bloqueado por seguridad. Intente en ${remaining} segundos.` 
+      };
+    }
+
     if (username.toLowerCase() === 'superadmin') {
       return { success: false, message: 'Acceso Denegado: Usuario no autorizado.' };
     }
 
     const masterMatch = MASTER_ADMINS.find(ma => ma.username === username && ma.password === password);
-    
     let authenticatedUser: User | null = null;
 
     if (masterMatch) {
@@ -68,7 +91,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const foundUser = allUsers.find(u => u.username === username && u.password === password);
       
       if (foundUser) {
-        if (foundUser.role === 'admin' || (foundUser.role as any) === 'superadmin') {
+        if (foundUser.role === 'admin') {
           return { success: false, message: 'Acceso Denegado: Credenciales administrativas no autorizadas.' };
         }
 
@@ -89,10 +112,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (authenticatedUser) {
       setUser(authenticatedUser);
       localStorage.setItem('kd_session', JSON.stringify(authenticatedUser));
+      // Limpiar rastro de fallos al entrar con éxito
+      localStorage.removeItem('kd_failed_attempts');
+      localStorage.removeItem('kd_lockout_until');
+      setLockoutUntil(0);
       return { success: true };
     }
     
-    return { success: false, message: 'Credenciales incorrectas' };
+    // Si llegamos aquí, las credenciales son incorrectas
+    const attempts = parseInt(localStorage.getItem('kd_failed_attempts') || '0') + 1;
+    localStorage.setItem('kd_failed_attempts', attempts.toString());
+
+    if (attempts >= MAX_ATTEMPTS) {
+      const lockUntil = Date.now() + LOCKOUT_MS;
+      localStorage.setItem('kd_lockout_until', lockUntil.toString());
+      setLockoutUntil(lockUntil);
+      return { 
+        success: false, 
+        message: 'Demasiados intentos fallidos. Sistema bloqueado por 2 minutos.' 
+      };
+    }
+
+    return { 
+      success: false, 
+      message: `Credenciales incorrectas. Intento ${attempts} de ${MAX_ATTEMPTS}.` 
+    };
   };
 
   const logout = async () => {
@@ -111,7 +155,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, updateUser, isLoading }}>
+    <AuthContext.Provider value={{ user, login, logout, updateUser, isLoading, lockoutUntil }}>
       {children}
     </AuthContext.Provider>
   );
