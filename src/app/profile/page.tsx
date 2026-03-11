@@ -10,10 +10,10 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Lock, ShieldCheck, AlertCircle, User as UserIcon, QrCode, Building2, Plus, Trash2, Camera, Wallet, Eye, Palette, Check, Sun, Moon, Laptop } from 'lucide-react';
+import { Lock, ShieldCheck, User as UserIcon, QrCode, Building2, Plus, Trash2, Camera, Wallet, Palette, Sun, Moon, Laptop, Sparkles, Type } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -23,12 +23,16 @@ function ProfileContent() {
   const { toast } = useToast();
   const [passwords, setPasswords] = useState({ current: '', new: '', confirm: '' });
   const [isChanging, setIsChanging] = useState(false);
-  const [isSavingTheme, setIsSavingTheme] = useState(false);
+  const [isSavingAppearance, setIsSavingAppearance] = useState(false);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [isMethodOpen, setIsMethodOpen] = useState(false);
+  
+  // States for branding
   const [primaryColor, setPrimaryColor] = useState(user?.primaryColor || '#008080');
   const [photoPreview, setPhotoPreview] = useState<string | null>(user?.photo || null);
   const [selectedTheme, setSelectedTheme] = useState<'light' | 'dark' | 'system'>(user?.theme || 'light');
+  const [brandName, setBrandName] = useState(user?.brandName || '');
+  const [slogan, setSlogan] = useState(user?.slogan || '');
 
   const [newMethod, setNewMethod] = useState<Partial<PaymentMethod>>({ type: 'bank', label: '', value: '', qrImage: '' });
 
@@ -69,23 +73,25 @@ function ProfileContent() {
     }
   };
 
-  const handleSaveTheme = async () => {
+  const handleSaveAppearance = async () => {
     if (!user) return;
-    setIsSavingTheme(true);
+    setIsSavingAppearance(true);
     try {
       const updatedUser: User = { 
         ...user, 
         primaryColor, 
         photo: photoPreview || undefined,
-        theme: selectedTheme 
+        theme: selectedTheme,
+        brandName: brandName || undefined,
+        slogan: slogan || undefined
       };
       await db.put('users', updatedUser);
       updateUser(updatedUser);
-      toast({ title: "Cambios Aplicados", description: "La personalización se ha guardado correctamente." });
+      toast({ title: "Identidad Visual Actualizada", description: "Los cambios se han aplicado a todo el sistema." });
     } catch (e) {
       toast({ variant: 'destructive', title: "Error", description: "No se pudieron guardar los cambios." });
     } finally {
-      setIsSavingTheme(false);
+      setIsSavingAppearance(false);
     }
   };
 
@@ -132,138 +138,185 @@ function ProfileContent() {
 
   return (
     <AppLayout>
-      <div className="max-w-4xl mx-auto space-y-8">
+      <div className="max-w-5xl mx-auto space-y-8">
         <div className="flex justify-between items-center">
           <div>
-            <h2 className="text-3xl font-bold text-primary">Configuración de Perfil</h2>
-            <p className="text-muted-foreground mt-2">Gestiona tu seguridad e identidad visual</p>
+            <h2 className="text-3xl font-black text-primary tracking-tight">Configuración de Perfil</h2>
+            <p className="text-muted-foreground mt-1">Personaliza tu entorno de trabajo y seguridad</p>
           </div>
-          {isAdmin && <Badge className="bg-primary/10 text-primary border-primary/20 h-8 px-4 text-xs font-bold uppercase">Administrador</Badge>}
+          {isAdmin && <Badge className="bg-primary/10 text-primary border-primary/20 h-8 px-4 text-xs font-black uppercase tracking-widest">Master Admin</Badge>}
         </div>
 
         <Tabs defaultValue="security" className="space-y-6">
-          <TabsList className="bg-muted p-1 rounded-xl h-auto">
-            <TabsTrigger value="security" className="py-2.5 px-6 gap-2"><Lock className="w-4 h-4" /> Seguridad</TabsTrigger>
-            <TabsTrigger value="appearance" className="py-2.5 px-6 gap-2"><Palette className="w-4 h-4" /> Personalización</TabsTrigger>
-            {isAdmin && <TabsTrigger value="billing" className="py-2.5 px-6 gap-2"><Wallet className="w-4 h-4" /> Medios de Pago</TabsTrigger>}
+          <TabsList className="bg-muted p-1 rounded-2xl h-auto w-full md:w-fit flex-wrap">
+            <TabsTrigger value="security" className="py-2.5 px-6 gap-2 rounded-xl data-[state=active]:shadow-lg"><Lock className="w-4 h-4" /> Seguridad</TabsTrigger>
+            <TabsTrigger value="appearance" className="py-2.5 px-6 gap-2 rounded-xl data-[state=active]:shadow-lg"><Palette className="w-4 h-4" /> Identidad de Marca</TabsTrigger>
+            {isAdmin && <TabsTrigger value="billing" className="py-2.5 px-6 gap-2 rounded-xl data-[state=active]:shadow-lg"><Wallet className="w-4 h-4" /> Medios de Pago</TabsTrigger>}
           </TabsList>
 
-          <TabsContent value="security">
+          <TabsContent value="security" className="animate-in fade-in duration-500">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <Card className="border-none shadow-sm h-fit">
+              <Card className="border-none shadow-xl shadow-slate-200/50 dark:shadow-none bg-white dark:bg-slate-950 rounded-3xl">
                 <CardHeader><CardTitle className="text-lg flex items-center gap-2"><ShieldCheck className="w-5 h-5 text-primary" /> Cambiar Contraseña</CardTitle></CardHeader>
                 <form onSubmit={handleChangePassword}>
                   <CardContent className="space-y-4">
-                    <div className="space-y-2"><Label>Contraseña Actual</Label><Input type="password" value={passwords.current} onChange={e => setPasswords({...passwords, current: e.target.value})} required className="rounded-xl h-11" /></div>
-                    <div className="space-y-2"><Label>Nueva Contraseña</Label><Input type="password" value={passwords.new} onChange={e => setPasswords({...passwords, new: e.target.value})} required className="rounded-xl h-11" /></div>
-                    <div className="space-y-2"><Label>Confirmar Nueva Contraseña</Label><Input type="password" value={passwords.confirm} onChange={e => setPasswords({...passwords, confirm: e.target.value})} required className="rounded-xl h-11" /></div>
+                    <div className="space-y-2"><Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Contraseña Actual</Label><Input type="password" value={passwords.current} onChange={e => setPasswords({...passwords, current: e.target.value})} required className="rounded-xl h-12 bg-slate-50 dark:bg-slate-900" /></div>
+                    <div className="space-y-2"><Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Nueva Contraseña</Label><Input type="password" value={passwords.new} onChange={e => setPasswords({...passwords, new: e.target.value})} required className="rounded-xl h-12 bg-slate-50 dark:bg-slate-900" /></div>
+                    <div className="space-y-2"><Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Confirmar Nueva Contraseña</Label><Input type="password" value={passwords.confirm} onChange={e => setPasswords({...passwords, confirm: e.target.value})} required className="rounded-xl h-12 bg-slate-50 dark:bg-slate-900" /></div>
                   </CardContent>
-                  <CardFooter><Button type="submit" className="w-full h-12 text-lg font-bold rounded-xl" disabled={isChanging}>{isChanging ? 'Actualizando...' : 'Actualizar Contraseña'}</Button></CardFooter>
+                  <CardFooter><Button type="submit" className="w-full h-14 text-lg font-black rounded-2xl shadow-xl shadow-primary/20" disabled={isChanging}>{isChanging ? 'Procesando...' : 'Guardar Nueva Contraseña'}</Button></CardFooter>
                 </form>
               </Card>
-              <Card className="border-none shadow-sm h-fit">
-                <CardHeader><CardTitle className="text-lg flex items-center gap-2"><UserIcon className="w-5 h-5 text-primary" /> Info de Cuenta</CardTitle></CardHeader>
+              <Card className="border-none shadow-xl shadow-slate-200/50 dark:shadow-none bg-white dark:bg-slate-950 rounded-3xl h-fit">
+                <CardHeader><CardTitle className="text-lg flex items-center gap-2"><UserIcon className="w-5 h-5 text-primary" /> Información de Usuario</CardTitle></CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 space-y-4">
-                    <div className="flex justify-between items-center"><span className="text-xs font-bold text-muted-foreground uppercase">Nombre:</span><span className="text-sm font-black">{user.fullName}</span></div>
-                    <div className="flex justify-between items-center"><span className="text-xs font-bold text-muted-foreground uppercase">Usuario:</span><span className="text-sm font-black text-primary">{user.username}</span></div>
+                  <div className="p-6 rounded-3xl bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 space-y-5">
+                    <div className="flex justify-between items-center"><span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Titular:</span><span className="text-sm font-black text-slate-900 dark:text-white">{user.fullName}</span></div>
+                    <div className="flex justify-between items-center"><span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Acceso:</span><span className="text-sm font-black text-primary">{user.username}</span></div>
+                    <div className="flex justify-between items-center"><span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Rol:</span><Badge variant="outline" className="font-black text-[10px] uppercase">{user.role}</Badge></div>
                   </div>
                 </CardContent>
               </Card>
             </div>
           </TabsContent>
 
-          <TabsContent value="appearance">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <Card className="border-none shadow-sm overflow-hidden h-fit">
-                <CardHeader><CardTitle className="text-lg flex items-center gap-2"><Palette className="w-5 h-5 text-primary" /> Apariencia</CardTitle></CardHeader>
-                <CardContent className="space-y-6">
-                  {isClinic && (
+          <TabsContent value="appearance" className="animate-in fade-in duration-500">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              <div className="lg:col-span-2 space-y-8">
+                <Card className="border-none shadow-xl shadow-slate-200/50 dark:shadow-none bg-white dark:bg-slate-950 rounded-3xl overflow-hidden">
+                  <div className="h-2 bg-primary" />
+                  <CardHeader><CardTitle className="text-xl flex items-center gap-2 font-black"><Sparkles className="w-5 h-5 text-primary" /> Personalización de Marca</CardTitle></CardHeader>
+                  <CardContent className="space-y-8">
+                    {isClinic && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div className="space-y-4">
+                          <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2"><Type className="w-3 h-3" /> Nombre de la Clínica</Label>
+                          <Input value={brandName} onChange={e => setBrandName(e.target.value)} placeholder="Ej: Clínica Dental Smile" className="h-12 rounded-xl bg-slate-50 dark:bg-slate-900 font-bold" />
+                        </div>
+                        <div className="space-y-4">
+                          <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2"><Sparkles className="w-3 h-3" /> Slogan / Lema</Label>
+                          <Input value={slogan} onChange={e => setSlogan(e.target.value)} placeholder="Ej: Tu sonrisa, nuestra prioridad" className="h-12 rounded-xl bg-slate-50 dark:bg-slate-900 italic" />
+                        </div>
+                        <div className="col-span-full space-y-4">
+                          <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Logo Institucional (Recomendado: Fondo transparente)</Label>
+                          <div className="flex flex-col md:flex-row items-center gap-6 p-8 border-2 border-dashed rounded-3xl bg-slate-50 dark:bg-slate-900 hover:bg-slate-100 transition-colors cursor-pointer group">
+                            <div className="w-48 h-24 bg-white dark:bg-white rounded-2xl shadow-inner border-2 border-slate-200 flex items-center justify-center overflow-hidden transition-transform group-hover:scale-105">
+                              {photoPreview ? <img src={photoPreview} className="max-w-full max-h-full object-contain p-2" /> : <Building2 className="w-10 h-10 text-slate-200" />}
+                            </div>
+                            <div className="flex-1 text-center md:text-left space-y-2">
+                               <p className="text-sm font-bold">Cargar nueva imagen</p>
+                               <p className="text-xs text-muted-foreground">Formato PNG o JPG (Máx. 2MB). Idealmente horizontal.</p>
+                               <Input type="file" accept="image/*" onChange={handlePhotoUpload} className="mt-2 h-10" />
+                            </div>
+                          </div>
+                        </div>
+                        <div className="col-span-full space-y-4">
+                          <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Paleta de Color Institucional</Label>
+                          <div className="flex items-center gap-8 p-6 bg-slate-50 dark:bg-slate-900 rounded-3xl border">
+                            <div className="w-20 h-20 rounded-2xl shadow-2xl ring-4 ring-white dark:ring-slate-800 transition-transform hover:scale-110" style={{ backgroundColor: primaryColor }} />
+                            <div className="flex-1 space-y-3">
+                               <p className="text-xs font-bold">Selecciona el color que identifica a tu consultorio.</p>
+                               <div className="flex gap-4">
+                                  <Input type="color" value={primaryColor} onChange={(e) => setPrimaryColor(e.target.value)} className="h-12 w-24 cursor-pointer p-1 rounded-xl" />
+                                  <div className="flex-1 grid grid-cols-5 gap-2">
+                                     {['#008080', '#2563eb', '#7c3aed', '#db2777', '#059669'].map(c => (
+                                       <button key={c} onClick={() => setPrimaryColor(c)} className="h-8 w-full rounded-lg border-2 border-white dark:border-slate-800 shadow-sm transition-all hover:scale-110" style={{ backgroundColor: c }} />
+                                     ))}
+                                  </div>
+                               </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                     <div className="space-y-4">
-                      <Label className="font-bold">Logo del Consultorio</Label>
-                      <div className="flex flex-col items-center gap-4 p-6 border-2 border-dashed rounded-3xl bg-slate-50 dark:bg-slate-900">
-                        <div className="w-48 h-20 bg-white rounded-xl shadow-inner border flex items-center justify-center overflow-hidden">
-                          {photoPreview ? <img src={photoPreview} className="max-w-full max-h-full object-contain" /> : <Building2 className="w-10 h-10 opacity-20" />}
+                      <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Tema Visual del Sistema</Label>
+                      <RadioGroup value={selectedTheme} onValueChange={(v: any) => setSelectedTheme(v)} className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <Label className={cn("flex flex-col items-center justify-between rounded-2xl border-2 border-slate-100 bg-white dark:bg-slate-900 p-6 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer transition-all", selectedTheme === 'light' && "border-primary bg-primary/5 shadow-inner")}>
+                          <RadioGroupItem value="light" className="sr-only" />
+                          <Sun className={cn("mb-3 h-8 w-8 text-slate-400", selectedTheme === 'light' && "text-primary")} />
+                          <span className="text-[10px] font-black uppercase tracking-widest">Modo Claro</span>
+                        </Label>
+                        <Label className={cn("flex flex-col items-center justify-between rounded-2xl border-2 border-slate-100 bg-white dark:bg-slate-900 p-6 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer transition-all", selectedTheme === 'dark' && "border-primary bg-primary/5 shadow-inner")}>
+                          <RadioGroupItem value="dark" className="sr-only" />
+                          <Moon className={cn("mb-3 h-8 w-8 text-slate-400", selectedTheme === 'dark' && "text-primary")} />
+                          <span className="text-[10px] font-black uppercase tracking-widest">Modo Oscuro</span>
+                        </Label>
+                        <Label className={cn("flex flex-col items-center justify-between rounded-2xl border-2 border-slate-100 bg-white dark:bg-slate-900 p-6 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer transition-all", selectedTheme === 'system' && "border-primary bg-primary/5 shadow-inner")}>
+                          <RadioGroupItem value="system" className="sr-only" />
+                          <Laptop className={cn("mb-3 h-8 w-8 text-slate-400", selectedTheme === 'system' && "text-primary")} />
+                          <span className="text-[10px] font-black uppercase tracking-widest">Sistema</span>
+                        </Label>
+                      </RadioGroup>
+                    </div>
+                  </CardContent>
+                  <CardFooter className="bg-slate-50 dark:bg-slate-900/50 p-6"><Button onClick={handleSaveAppearance} className="w-full h-16 text-lg font-black rounded-2xl shadow-xl shadow-primary/20 transition-transform active:scale-95" disabled={isSavingAppearance}>{isSavingAppearance ? 'Guardando Cambios...' : 'Aplicar Nueva Identidad Visual'}</Button></CardFooter>
+                </Card>
+              </div>
+
+              <div className="space-y-6">
+                <p className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground px-2">Vista Previa</p>
+                <div className={cn("border-4 border-white dark:border-slate-800 rounded-[2.5rem] overflow-hidden shadow-2xl h-[600px] sticky top-8 transition-all", selectedTheme === 'dark' && "dark")}>
+                  <div className="h-full bg-background flex flex-col">
+                     <div className="h-14 border-b px-6 flex items-center justify-between" style={{ backgroundColor: primaryColor }}>
+                        <div className="flex gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-white/30" /><div className="w-2.5 h-2.5 rounded-full bg-white/30" /></div>
+                        {photoPreview ? <img src={photoPreview} className="h-6 object-contain brightness-0 invert" alt="logo" /> : <div className="h-3 w-20 bg-white/20 rounded" />}
+                     </div>
+                     <div className="flex-1 flex">
+                        <div className="w-16 border-r flex flex-col items-center py-6 gap-6" style={{ backgroundColor: primaryColor + '08' }}>
+                           <div className="w-8 h-8 rounded-xl shadow-sm" style={{ backgroundColor: primaryColor }} />
+                           <div className="w-6 h-6 rounded bg-slate-200 dark:bg-slate-800" />
+                           <div className="w-6 h-6 rounded bg-slate-200 dark:bg-slate-800" />
                         </div>
-                        <Input type="file" accept="image/*" onChange={handlePhotoUpload} className="h-10 cursor-pointer" />
-                      </div>
-                      <div className="space-y-4 mt-6">
-                        <Label className="font-bold">Color Primario</Label>
-                        <div className="flex items-center gap-6">
-                          <div className="w-16 h-16 rounded-2xl shadow-lg border-4 border-white dark:border-slate-800" style={{ backgroundColor: primaryColor }} />
-                          <Input type="color" value={primaryColor} onChange={(e) => setPrimaryColor(e.target.value)} className="h-12 w-full cursor-pointer p-1 rounded-xl" />
+                        <div className="flex-1 p-8 space-y-6">
+                           <div className="space-y-1">
+                             <div className="h-2 w-12 rounded bg-primary/20" />
+                             <div className="h-6 w-3/4 rounded-lg bg-slate-900 dark:bg-white" />
+                           </div>
+                           <div className="h-32 w-full rounded-3xl border border-dashed border-primary/20 bg-primary/5 flex items-center justify-center">
+                              <Sparkles className="w-8 h-8" style={{ color: primaryColor }} />
+                           </div>
+                           <div className="grid grid-cols-2 gap-4">
+                              <div className="h-10 rounded-xl" style={{ backgroundColor: primaryColor }} />
+                              <div className="h-10 rounded-xl border-2" style={{ borderColor: primaryColor, color: primaryColor }} />
+                           </div>
                         </div>
-                      </div>
-                    </div>
-                  )}
-                  <div className="space-y-4">
-                    <Label className="font-bold">Tema del Sistema</Label>
-                    <RadioGroup value={selectedTheme} onValueChange={(v: any) => setSelectedTheme(v)} className="grid grid-cols-3 gap-4">
-                      <Label className={cn("flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground cursor-pointer", selectedTheme === 'light' && "border-primary")}>
-                        <RadioGroupItem value="light" className="sr-only" />
-                        <Sun className="mb-3 h-6 w-6" />
-                        <span className="text-xs font-bold uppercase tracking-widest">Claro</span>
-                      </Label>
-                      <Label className={cn("flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground cursor-pointer", selectedTheme === 'dark' && "border-primary")}>
-                        <RadioGroupItem value="dark" className="sr-only" />
-                        <Moon className="mb-3 h-6 w-6" />
-                        <span className="text-xs font-bold uppercase tracking-widest">Oscuro</span>
-                      </Label>
-                      <Label className={cn("flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground cursor-pointer", selectedTheme === 'system' && "border-primary")}>
-                        <RadioGroupItem value="system" className="sr-only" />
-                        <Laptop className="mb-3 h-6 w-6" />
-                        <span className="text-xs font-bold uppercase tracking-widest">Sistema</span>
-                      </Label>
-                    </RadioGroup>
+                     </div>
                   </div>
-                </CardContent>
-                <CardFooter><Button onClick={handleSaveTheme} className="w-full h-12 text-lg font-bold rounded-xl" disabled={isSavingTheme}>{isSavingTheme ? 'Guardando...' : 'Aplicar Cambios'}</Button></CardFooter>
-              </Card>
-              <Card className="border-none shadow-sm h-fit">
-                <CardHeader><CardTitle className="text-lg">Previsualización</CardTitle></CardHeader>
-                <CardContent>
-                  <div className={cn("border rounded-2xl overflow-hidden shadow-xl", selectedTheme === 'dark' && "dark")}>
-                    <div className="h-10 border-b flex items-center px-4 bg-white dark:bg-slate-950">
-                      <div className="w-3 h-3 rounded-full bg-red-400 mr-2" /><div className="w-3 h-3 rounded-full bg-amber-400 mr-2" /><div className="w-3 h-3 rounded-full bg-emerald-400" />
-                    </div>
-                    <div className="flex h-64 bg-background">
-                      <div className="w-16 border-r flex flex-col items-center py-4 gap-4" style={{ backgroundColor: primaryColor + '10' }}>
-                         <div className="w-8 h-8 rounded-lg" style={{ backgroundColor: primaryColor }} />
-                      </div>
-                      <div className="flex-1 p-6 space-y-4">
-                         <div className="h-4 w-3/4 rounded" style={{ backgroundColor: primaryColor + '20' }} />
-                         <div className="h-10 w-full rounded-xl" style={{ backgroundColor: primaryColor }} />
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             </div>
           </TabsContent>
 
           {isAdmin && (
-            <TabsContent value="billing">
-              <Card className="border-none shadow-sm">
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <div><CardTitle className="text-xl">Medios de Pago</CardTitle><CardDescription>Configura los datos para los consultorios.</CardDescription></div>
-                  <Button onClick={() => setIsMethodOpen(true)} className="gap-2 h-11"><Plus className="w-5 h-5" /> Agregar</Button>
+            <TabsContent value="billing" className="animate-in fade-in duration-500">
+              <Card className="border-none shadow-xl shadow-slate-200/50 dark:shadow-none bg-white dark:bg-slate-950 rounded-3xl">
+                <CardHeader className="flex flex-row items-center justify-between border-b pb-8">
+                  <div><CardTitle className="text-xl font-black">Medios de Pago Centralizados</CardTitle><CardDescription>Estos datos se mostrarán en todos los paneles de consultorios.</CardDescription></div>
+                  <Button onClick={() => setIsMethodOpen(true)} className="gap-2 h-12 rounded-2xl shadow-lg shadow-primary/20"><Plus className="w-5 h-5" /> Agregar Medio</Button>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="pt-8">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {paymentMethods.map(m => (
-                      <Card key={m.id} className="border-none shadow-sm bg-slate-50 dark:bg-slate-900 relative group">
-                        <CardContent className="pt-6">
-                          <div className="flex items-start gap-4">
-                            <div className="p-4 bg-white dark:bg-slate-800 rounded-2xl text-primary"><QrCode className="w-8 h-8" /></div>
+                      <Card key={m.id} className="border-none shadow-sm bg-slate-50 dark:bg-slate-900 rounded-3xl relative group hover:shadow-xl transition-all border border-transparent hover:border-primary/10">
+                        <CardContent className="p-6">
+                          <div className="flex items-start gap-5">
+                            <div className="p-5 bg-white dark:bg-slate-800 rounded-2xl text-primary shadow-sm border border-slate-100 dark:border-slate-700 transition-transform group-hover:scale-105"><QrCode className="w-8 h-8" /></div>
                             <div className="flex-1 min-w-0">
-                              <p className="font-black text-sm uppercase text-slate-400">{m.label}</p>
-                              <p className="text-lg font-black break-all">{m.value}</p>
+                              <p className="font-black text-[10px] uppercase text-muted-foreground tracking-widest mb-1">{m.label}</p>
+                              <p className="text-lg font-black break-all text-slate-800 dark:text-white leading-tight">{m.value}</p>
                             </div>
                           </div>
-                          <Button variant="ghost" size="icon" onClick={() => deleteMethod(m.id)} className="absolute top-2 right-2 text-destructive opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="w-5 h-5" /></Button>
+                          <Button variant="ghost" size="icon" onClick={() => deleteMethod(m.id)} className="absolute top-3 right-3 text-destructive opacity-0 group-hover:opacity-100 transition-opacity bg-white/50 dark:bg-slate-800/50 rounded-full hover:bg-red-50"><Trash2 className="w-5 h-5" /></Button>
                         </CardContent>
                       </Card>
                     ))}
+                    {paymentMethods.length === 0 && (
+                      <div className="col-span-full py-20 text-center border-2 border-dashed rounded-3xl bg-slate-50/50">
+                        <Wallet className="w-12 h-12 mx-auto mb-4 opacity-10" />
+                        <p className="text-xs font-black uppercase tracking-widest text-muted-foreground">No hay medios de pago configurados</p>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -273,15 +326,18 @@ function ProfileContent() {
       </div>
 
       <Dialog open={isMethodOpen} onOpenChange={setIsMethodOpen}>
-        <DialogContent className="sm:max-w-md rounded-3xl">
-          <DialogHeader><DialogTitle className="text-xl font-bold flex items-center gap-2"><Plus className="text-primary w-6 h-6" /> Nuevo Medio de Pago</DialogTitle></DialogHeader>
-          <form onSubmit={handleAddMethod} className="space-y-4 py-4">
-            <div className="space-y-2"><Label>Tipo</Label><Select value={newMethod.type} onValueChange={v => setNewMethod({...newMethod, type: v as any})}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="bank">Banco</SelectItem><SelectItem value="qr">QR</SelectItem></SelectContent></Select></div>
-            <div className="space-y-2"><Label>Entidad</Label><Input value={newMethod.label} onChange={e => setNewMethod({...newMethod, label: e.target.value})} required className="h-11 rounded-xl" /></div>
-            <div className="space-y-2"><Label>Valor</Label><Input value={newMethod.value} onChange={e => setNewMethod({...newMethod, value: e.target.value})} required className="h-11 rounded-xl" /></div>
-            {newMethod.type === 'qr' && <div className="space-y-2"><Label>Imagen QR</Label><Input type="file" accept="image/*" onChange={handleQrUpload} className="h-11" /></div>}
-            <DialogFooter><Button type="submit" className="w-full h-14 text-lg font-bold rounded-2xl">Guardar</Button></DialogFooter>
-          </form>
+        <DialogContent className="sm:max-w-md rounded-[2.5rem] border-none shadow-2xl overflow-hidden p-0">
+          <div className="bg-primary h-2" />
+          <div className="p-10 space-y-6">
+            <DialogHeader><DialogTitle className="text-2xl font-black flex items-center gap-3"><Plus className="text-primary w-8 h-8" /> Nuevo Medio de Pago</DialogTitle></DialogHeader>
+            <form onSubmit={handleAddMethod} className="space-y-5">
+              <div className="space-y-2"><Label className="text-xs font-bold uppercase tracking-widest">Tipo de Medio</Label><Select value={newMethod.type} onValueChange={v => setNewMethod({...newMethod, type: v as any})}><SelectTrigger className="h-12 rounded-2xl"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="bank">Cuenta Bancaria (Transferencia)</SelectItem><SelectItem value="qr">Código QR (Yape/Plin)</SelectItem></SelectContent></Select></div>
+              <div className="space-y-2"><Label className="text-xs font-bold uppercase tracking-widest">Entidad / Banco</Label><Input value={newMethod.label} onChange={e => setNewMethod({...newMethod, label: e.target.value})} required className="h-12 rounded-2xl bg-slate-50" placeholder="Ej: BCP Soles" /></div>
+              <div className="space-y-2"><Label className="text-xs font-bold uppercase tracking-widest">Número / Dato</Label><Input value={newMethod.value} onChange={e => setNewMethod({...newMethod, value: e.target.value})} required className="h-12 rounded-2xl bg-slate-50" placeholder="Ej: 191-234567-0-91" /></div>
+              {newMethod.type === 'qr' && <div className="space-y-2"><Label className="text-xs font-bold uppercase tracking-widest">Imagen del Código QR</Label><div className="flex items-center gap-4 bg-slate-50 p-4 rounded-2xl border-2 border-dashed"><QrCode className="w-8 h-8 opacity-20" /><Input type="file" accept="image/*" onChange={handleQrUpload} className="h-10 border-none bg-transparent shadow-none" /></div></div>}
+              <Button type="submit" className="w-full h-16 text-lg font-black rounded-2xl shadow-xl shadow-primary/20 mt-4">Guardar Configuración</Button>
+            </form>
+          </div>
         </DialogContent>
       </Dialog>
     </AppLayout>

@@ -2,7 +2,7 @@
 "use client";
 
 const DB_NAME = "KuskoDentoDB";
-const DB_VERSION = 10;
+const DB_VERSION = 11; // Incrementado por cambios en User
 
 export type UserRole = 'admin' | 'clinic' | 'doctor' | 'assistant' | 'technician';
 
@@ -26,6 +26,8 @@ export interface User {
   subscriptionStatus: 'active' | 'suspended' | 'blocked';
   registeredByAdminId?: string;
   primaryColor?: string;
+  brandName?: string; // Nuevo
+  slogan?: string;    // Nuevo
   theme?: 'light' | 'dark' | 'system';
 }
 

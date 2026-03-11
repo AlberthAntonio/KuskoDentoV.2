@@ -4,7 +4,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { SidebarProvider, Sidebar, SidebarContent, SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarTrigger, SidebarInset } from '@/components/ui/sidebar';
-import { Users, UserSquare2, Stethoscope, Landmark, Activity, Calendar, Database, LogOut, LayoutDashboard, ShieldCheck, BarChart3, CreditCard, AlertTriangle, QrCode, Building2, ShieldAlert, Banknote, User as UserIcon, X, CheckCircle2, MessageCircle, Boxes, Wallet, Timer, AlertCircle, Sun, Moon } from 'lucide-react';
+import { Users, UserSquare2, Stethoscope, Landmark, Activity, Calendar, Database, LogOut, LayoutDashboard, ShieldCheck, BarChart3, CreditCard, AlertTriangle, QrCode, Building2, ShieldAlert, Banknote, User as UserIcon, X, MessageCircle, Boxes, Wallet, Timer, AlertCircle, Sun, Moon, Laptop, Sparkles } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -111,6 +111,12 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           --sidebar-primary: ${hslValue} !important;
           --sidebar-accent-foreground: ${hslValue} !important;
         }
+        [data-sidebar="menu-button"][data-active="true"] {
+          background-color: hsla(${hslValue}, 0.1) !important;
+          border-left: 3px solid hsl(${hslValue}) !important;
+          border-radius: 0 0.5rem 0.5rem 0 !important;
+          color: hsl(${hslValue}) !important;
+        }
       `;
     }
   }, [user?.primaryColor]);
@@ -161,13 +167,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   if (isBlocked && !isAdmin) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center p-6">
-        <div className="max-w-md w-full bg-white rounded-3xl shadow-2xl overflow-hidden p-8 text-center space-y-6">
-          <div className="w-20 h-20 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto">
+        <div className="max-w-md w-full bg-white rounded-[3rem] shadow-2xl overflow-hidden p-10 text-center space-y-6">
+          <div className="w-24 h-24 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto shadow-inner">
             <ShieldAlert className="w-12 h-12" />
           </div>
-          <h2 className="text-2xl font-bold text-slate-900">Cuenta Bloqueada</h2>
-          <p className="text-slate-600">Comuníquese con el administrador para restablecer el acceso a su consultorio.</p>
-          <button onClick={logout} className="w-full py-3 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-colors">
+          <h2 className="text-3xl font-black text-slate-900 tracking-tighter">Cuenta Bloqueada</h2>
+          <p className="text-slate-600 font-medium leading-relaxed">Comuníquese con el administrador central para restablecer el acceso a su consultorio.</p>
+          <button onClick={logout} className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-slate-800 transition-all shadow-xl active:scale-95">
             Cerrar Sesión
           </button>
         </div>
@@ -177,63 +183,68 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <SidebarProvider>
-      <div className="flex h-screen w-full overflow-hidden">
-        <Sidebar variant="inset" className="border-r">
-          <SidebarHeader className="p-6">
+      <div className="flex h-screen w-full overflow-hidden bg-slate-50 dark:bg-slate-950">
+        <Sidebar variant="inset" className="border-none shadow-2xl shadow-slate-200/50 dark:shadow-none">
+          <SidebarHeader className="p-8 pb-4">
             {user.photo ? (
-              <div className="h-12 w-full flex items-center justify-center overflow-hidden">
+              <div className="h-16 w-full flex items-center justify-start overflow-hidden px-2 mb-2">
                 <img src={user.photo} className="max-h-full max-w-full object-contain" alt="Logo de la Clínica" />
               </div>
             ) : (
-              <>
-                <h1 className="text-2xl font-bold text-primary tracking-tight">KuskoDento</h1>
-                <p className="text-xs text-muted-foreground">Gestión Odontológica</p>
-              </>
+              <div className="flex items-center gap-4 px-2 mb-4 group">
+                <div className="w-12 h-12 bg-primary rounded-2xl flex items-center justify-center text-white shadow-lg group-hover:scale-110 transition-transform">
+                   <Sparkles className="w-6 h-6" />
+                </div>
+                <div>
+                   <h1 className="text-xl font-black text-primary tracking-tight leading-none uppercase">{user.brandName || 'KuskoDento'}</h1>
+                   <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest mt-1">{user.slogan || 'Digital Health'}</p>
+                </div>
+              </div>
             )}
           </SidebarHeader>
-          <SidebarContent>
-            <SidebarMenu className="px-4">
+          <SidebarContent className="pt-4">
+            <SidebarMenu className="px-4 space-y-1">
               {menuItems.filter(i => i.show).map((item) => (
                 <SidebarMenuItem key={item.href}>
                   <SidebarMenuButton 
                     asChild 
                     isActive={pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href))}
-                    className="py-6 px-4"
+                    className="py-6 px-5 transition-all"
                   >
-                    <Link href={item.href} className="flex items-center gap-3">
-                      <item.icon className="w-5 h-5" />
-                      <span className="font-medium">{item.label}</span>
+                    <Link href={item.href} className="flex items-center gap-4">
+                      <item.icon className="w-5 h-5 opacity-80" />
+                      <span className="font-bold tracking-tight">{item.label}</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>
           </SidebarContent>
-          <div className="mt-auto p-6 border-t">
+          <div className="mt-auto p-8 border-t bg-slate-50/50 dark:bg-slate-900/20">
             {!isAdmin && (
-              <div className="mb-4 px-2 space-y-3">
-                <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 space-y-2">
+              <div className="mb-6 space-y-4">
+                <div className="p-5 bg-white dark:bg-slate-900 rounded-[1.5rem] border shadow-sm space-y-3">
                   <div className="flex justify-between items-center">
-                    <p className="text-[10px] uppercase font-black text-muted-foreground tracking-widest">Suscripción</p>
+                    <p className="text-[10px] uppercase font-black text-muted-foreground tracking-widest leading-none">Status Acceso</p>
                     <Badge 
                       variant={currentStatus === 'active' ? 'default' : 'destructive'} 
                       className={cn(
-                        "text-[9px] h-4 font-black px-1.5",
+                        "text-[9px] h-5 font-black px-2 uppercase tracking-tighter",
                         isOverdue && "bg-amber-500 hover:bg-amber-600",
                         currentStatus === 'active' && "bg-emerald-500 hover:bg-emerald-600"
                       )}
                     >
-                      {isBlocked ? 'BLOQUEADA' : isSuspended ? 'SUSPENDIDA' : isOverdue ? 'MORA' : 'ACTIVA'}
+                      {isBlocked ? 'BLOQUEADO' : isSuspended ? 'SUSPENDIDO' : isOverdue ? 'EN MORA' : 'ACTIVO'}
                     </Badge>
                   </div>
-                  <div className="space-y-1">
-                    <p className="flex justify-between text-[10px] font-bold">
-                      <span className="text-muted-foreground">MENSUALIDAD:</span>
+                  <div className="space-y-2">
+                    <p className="flex justify-between text-[11px] font-bold">
+                      <span className="text-muted-foreground">ABONO:</span>
                       <span className="text-primary">S/. {user.subscriptionFee?.toFixed(2)}</span>
                     </p>
                     {user.nextPaymentDate && (
-                      <p className="flex justify-between text-[10px] font-bold">
-                        <span className="text-muted-foreground">VENCIMIENTO:</span>
+                      <p className="flex justify-between text-[11px] font-bold">
+                        <span className="text-muted-foreground">LÍMITE:</span>
                         <span className={cn(isOverdue ? "text-amber-600" : "text-slate-600 dark:text-slate-400")}>
                           {format(parseISO(user.nextPaymentDate), 'dd/MM/yyyy')}
                         </span>
@@ -244,77 +255,80 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 <Button 
                   variant="default" 
                   size="sm" 
-                  className="w-full h-10 text-[10px] font-black gap-2 shadow-lg shadow-primary/10 rounded-xl uppercase tracking-widest" 
+                  className="w-full h-12 text-[10px] font-black gap-3 shadow-xl shadow-primary/20 rounded-2xl uppercase tracking-widest transition-transform active:scale-95" 
                   onClick={() => setIsPayModalOpen(true)}
                 >
-                  <Wallet className="w-3.5 h-3.5" />
+                  <Wallet className="w-4 h-4" />
                   Pagar / Renovar
                 </Button>
               </div>
             )}
             <button 
               onClick={logout}
-              className="flex items-center gap-3 text-destructive hover:bg-destructive/10 w-full p-2 rounded-md transition-colors"
+              className="flex items-center gap-4 text-destructive hover:bg-destructive/10 w-full p-4 rounded-2xl transition-colors font-black text-xs uppercase tracking-widest"
             >
               <LogOut className="w-5 h-5" />
-              <span className="font-medium">Cerrar Sesión</span>
+              <span>Cerrar Sesión</span>
             </button>
           </div>
         </Sidebar>
-        <SidebarInset className="bg-background">
-          <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
-            <SidebarTrigger />
+        <SidebarInset className="bg-transparent">
+          <header className="flex h-20 shrink-0 items-center gap-4 border-b bg-white dark:bg-slate-950 px-8">
+            <SidebarTrigger className="h-10 w-10 hover:bg-primary/5 hover:text-primary transition-colors" />
             <div className="flex-1 flex justify-center">
               {isOverdue && !isAdmin && !isSuspended && (
-                <div className="bg-amber-100 dark:bg-amber-900/30 border border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200 px-4 py-1.5 rounded-full flex items-center gap-3 animate-pulse">
-                  <AlertTriangle className="w-4 h-4 text-amber-600" />
-                  <span className="text-xs font-bold uppercase tracking-tight">Periodo de gracia activo. Regularice su pago hoy.</span>
-                  <Button variant="ghost" size="sm" className="h-6 text-[10px] font-black underline p-0 hover:bg-transparent ml-2" onClick={() => setIsPayModalOpen(true)}>PAGAR AQUÍ</Button>
+                <div className="bg-amber-100 dark:bg-amber-900/30 border border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200 px-6 py-2 rounded-full flex items-center gap-4 animate-pulse shadow-lg shadow-amber-500/10">
+                  <AlertTriangle className="w-5 h-5 text-amber-600" />
+                  <span className="text-[11px] font-black uppercase tracking-tight">Periodo de gracia activo. Realice su pago hoy para evitar suspensión.</span>
+                  <Button variant="ghost" size="sm" className="h-8 text-[11px] font-black underline p-0 hover:bg-transparent ml-4 uppercase tracking-widest" onClick={() => setIsPayModalOpen(true)}>Pagar ahora</Button>
                 </div>
               )}
             </div>
-            <div className="flex items-center gap-2">
-              <Button variant="ghost" size="icon" onClick={toggleTheme} className="rounded-full">
-                {user.theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+            <div className="flex items-center gap-4">
+              <Button variant="ghost" size="icon" onClick={toggleTheme} className="rounded-full h-12 w-12 hover:bg-primary/5 hover:text-primary">
+                {user.theme === 'dark' ? <Sun className="w-6 h-6" /> : <Moon className="w-6 h-6" />}
               </Button>
-              <div className="flex items-center gap-3 px-2">
+              <div className="h-10 w-[1px] bg-slate-100 dark:bg-slate-800" />
+              <div className="flex items-center gap-4 px-2 group cursor-pointer" onClick={() => window.location.href = '/profile'}>
                 <div className="text-right hidden sm:block">
-                  <p className="text-sm font-bold">{user.fullName || user.username}</p>
-                  <p className="text-[10px] text-muted-foreground uppercase">{isAdmin ? 'Administrador' : user.role}</p>
+                  <p className="text-sm font-black text-slate-900 dark:text-white leading-none">{user.fullName || user.username}</p>
+                  <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest mt-1">{isAdmin ? 'Master Admin' : user.role}</p>
                 </div>
-                <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-sm font-bold">
+                <div className="w-12 h-12 rounded-2xl bg-primary flex items-center justify-center text-white text-lg font-black shadow-lg group-hover:scale-110 transition-transform">
                   {(user.fullName || user.username).charAt(0).toUpperCase()}
                 </div>
               </div>
             </div>
           </header>
-          <main className="flex-1 overflow-auto p-8 relative">
+          <main className="flex-1 overflow-auto p-10 relative scrollbar-hide">
             {isSuspended && !isAdmin && (
-              <div className="absolute inset-0 bg-white/80 dark:bg-black/80 backdrop-blur-[4px] z-[100] flex items-center justify-center p-8 text-center">
-                <div className="max-w-4xl w-full bg-white dark:bg-slate-950 border-2 border-amber-200 dark:border-amber-900 rounded-3xl shadow-2xl p-10 space-y-6 overflow-y-auto max-h-full scrollbar-hide">
-                  <div className="w-16 h-16 bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-500 rounded-full flex items-center justify-center mx-auto">
-                    <AlertTriangle className="w-10 h-10" />
+              <div className="absolute inset-0 bg-white/90 dark:bg-black/90 backdrop-blur-md z-[100] flex items-center justify-center p-8 text-center animate-in fade-in duration-500">
+                <div className="max-w-4xl w-full bg-white dark:bg-slate-950 border-4 border-amber-200 dark:border-amber-900 rounded-[3.5rem] shadow-[0_35px_60px_-15px_rgba(0,0,0,0.3)] p-12 space-y-8 overflow-y-auto max-h-full scrollbar-hide">
+                  <div className="w-20 h-20 bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-500 rounded-3xl flex items-center justify-center mx-auto shadow-inner">
+                    <AlertTriangle className="w-12 h-12" />
                   </div>
-                  <h3 className="text-2xl font-bold text-slate-900 dark:text-white uppercase">Servicio Suspendido</h3>
-                  <p className="text-slate-600 dark:text-slate-400 leading-relaxed font-medium">
-                    Su acceso ha sido restringido por falta de pago. Realice el depósito y envíe el comprobante a cualquiera de nuestros administradores para reactivar sus módulos.
-                  </p>
-                  <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-8 text-left space-y-6">
-                    <p className="text-xs font-black uppercase text-slate-400 tracking-widest border-b pb-2">Información para Pagos</p>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-3">
+                    <h3 className="text-3xl font-black text-slate-900 dark:text-white uppercase tracking-tighter">Acceso Restringido</h3>
+                    <p className="text-slate-600 dark:text-slate-400 leading-relaxed font-bold text-lg">
+                      Su servicio ha sido suspendido por falta de pago. Regularice su cuenta para reactivar sus módulos.
+                    </p>
+                  </div>
+                  <div className="bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 rounded-[2.5rem] p-10 text-left space-y-8 shadow-inner">
+                    <p className="text-[11px] font-black uppercase text-slate-400 tracking-[0.3em] border-b pb-4">Medios de Pago Autorizados</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                       {paymentMethods.map(m => (
-                        <div key={m.id} className="bg-white dark:bg-slate-950 p-6 rounded-2xl border border-slate-100 dark:border-slate-800 flex flex-col items-center text-center gap-4 shadow-sm hover:shadow-md transition-all">
-                           <div className="p-3 bg-primary/5 rounded-xl text-primary">
-                             {m.type === 'qr' ? <QrCode className="w-6 h-6" /> : <Building2 className="w-6 h-6" />}
+                        <div key={m.id} className="bg-white dark:bg-slate-950 p-8 rounded-[2rem] border shadow-xl flex flex-col items-center text-center gap-6 hover:scale-[1.03] transition-transform">
+                           <div className="p-5 bg-primary/10 rounded-2xl text-primary">
+                             {m.type === 'qr' ? <QrCode className="w-8 h-8" /> : <Building2 className="w-8 h-8" />}
                            </div>
-                           <div className="min-w-0 w-full space-y-2">
-                             <p className="text-[10px] font-black uppercase text-muted-foreground leading-none tracking-widest">{m.label}</p>
-                             <p className="text-lg font-black text-slate-900 dark:text-white break-all">{m.value}</p>
+                           <div className="min-w-0 w-full space-y-3">
+                             <p className="text-[11px] font-black uppercase text-muted-foreground tracking-widest leading-none">{m.label}</p>
+                             <p className="text-xl font-black text-slate-900 dark:text-white break-all leading-tight">{m.value}</p>
                              {m.qrImage && (
-                               <div className="mt-4 p-4 bg-white rounded-2xl inline-block shadow-lg">
+                               <div className="mt-6 p-6 bg-white rounded-3xl inline-block shadow-2xl border-4 border-primary/10">
                                  <img src={m.qrImage} className="w-64 h-64 object-contain mx-auto" alt="QR de Pago" />
-                                 <div className="mt-3 py-2 bg-primary text-white rounded-lg">
-                                   <p className="text-[10px] font-bold uppercase tracking-widest">Escanea con Yape o Plin</p>
+                                 <div className="mt-4 py-3 bg-primary text-white rounded-xl">
+                                   <p className="text-[11px] font-black uppercase tracking-widest">Escanea para pagar</p>
                                  </div>
                                </div>
                              )}
@@ -323,18 +337,18 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                       ))}
                     </div>
                   </div>
-                  <div className="space-y-6">
-                    <p className="text-[10px] uppercase font-black text-muted-foreground tracking-[0.2em]">Reportar Pago vía WhatsApp (Captura de pantalla)</p>
-                    <div className="flex flex-col sm:flex-row justify-center gap-4">
-                      <a href="https://wa.me/51929110834" target="_blank" className="flex-1 h-16 bg-emerald-600 text-white text-sm font-black rounded-2xl hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-100 flex items-center justify-center gap-3 uppercase">
-                        <MessageCircle className="w-6 h-6" /> Reportar a Adm. 1
+                  <div className="space-y-8 pt-4">
+                    <p className="text-[11px] uppercase font-black text-muted-foreground tracking-[0.3em]">Enviar comprobante vía WhatsApp</p>
+                    <div className="flex flex-col sm:flex-row justify-center gap-6">
+                      <a href="https://wa.me/51929110834" target="_blank" className="flex-1 h-18 py-6 bg-emerald-600 text-white text-xs font-black rounded-3xl hover:bg-emerald-700 transition-all shadow-2xl shadow-emerald-500/20 flex items-center justify-center gap-4 uppercase tracking-widest active:scale-95">
+                        <MessageCircle className="w-8 h-8" /> Reportar Adm. 1
                       </a>
-                      <a href="https://wa.me/51942239654" target="_blank" className="flex-1 h-16 bg-emerald-600 text-white text-sm font-black rounded-2xl hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-100 flex items-center justify-center gap-3 uppercase">
-                        <MessageCircle className="w-6 h-6" /> Reportar a Adm. 2
+                      <a href="https://wa.me/51942239654" target="_blank" className="flex-1 h-18 py-6 bg-emerald-600 text-white text-xs font-black rounded-3xl hover:bg-emerald-700 transition-all shadow-2xl shadow-emerald-500/20 flex items-center justify-center gap-4 uppercase tracking-widest active:scale-95">
+                        <MessageCircle className="w-8 h-8" /> Reportar Adm. 2
                       </a>
                     </div>
-                    <button onClick={logout} className="text-sm font-bold text-red-600 hover:bg-red-50 px-8 py-3 rounded-xl transition-colors">
-                      Cerrar Sesión
+                    <button onClick={logout} className="text-xs font-black text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 px-10 py-4 rounded-2xl transition-all uppercase tracking-[0.2em]">
+                      Salir del Sistema
                     </button>
                   </div>
                 </div>
@@ -344,42 +358,49 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           </main>
         </SidebarInset>
         <Dialog open={isPayModalOpen} onOpenChange={setIsPayModalOpen}>
-          <DialogContent className="sm:max-w-3xl rounded-3xl max-h-[90vh] overflow-y-auto scrollbar-hide">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2 text-2xl font-bold">
-                <Banknote className="w-6 h-6 text-emerald-600" /> Medios de Pago Autorizados
-              </DialogTitle>
-              <DialogDescription className="text-sm font-medium">
-                Realice su abono mensual o adelanto para mantener su servicio activo. Luego, envíe el comprobante a soporte.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-6">
-              {paymentMethods.map(m => (
-                <div key={m.id} className="p-6 rounded-2xl border bg-slate-50 dark:bg-slate-900 flex flex-col items-center gap-4 transition-all hover:bg-white dark:hover:bg-slate-950 hover:shadow-lg group">
-                   <div className="p-4 bg-white dark:bg-slate-800 rounded-xl text-primary border border-slate-100 dark:border-slate-700 group-hover:scale-105 transition-transform">
-                     {m.type === 'qr' ? <QrCode className="w-8 h-8" /> : <Building2 className="w-8 h-8" />}
-                   </div>
-                   <div className="text-center w-full space-y-2">
-                      <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest leading-none">{m.label}</p>
-                      <p className="text-xl font-black text-slate-800 dark:text-white break-all">{m.value}</p>
-                      {m.qrImage && (
-                        <div className="mt-4 p-4 bg-white rounded-2xl inline-block border-2 border-primary/20 shadow-xl group-hover:border-primary transition-colors">
-                          <img src={m.qrImage} className="w-60 h-60 object-contain mx-auto" alt="QR Scan" />
-                        </div>
-                      )}
-                   </div>
+          <DialogContent className="sm:max-w-4xl rounded-[3.5rem] border-none shadow-[0_35px_60px_-15px_rgba(0,0,0,0.5)] max-h-[90vh] overflow-y-auto scrollbar-hide p-0">
+            <div className="bg-primary h-3" />
+            <div className="p-14 space-y-10">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-4 text-3xl font-black tracking-tight">
+                  <div className="p-3 bg-emerald-100 text-emerald-600 rounded-2xl"><Banknote className="w-8 h-8" /></div>
+                  Medios de Pago Autorizados
+                </DialogTitle>
+                <DialogDescription className="text-lg font-bold text-slate-600 dark:text-slate-400 mt-4 leading-relaxed">
+                  Realice su abono mensual para mantener el servicio activo. Luego de pagar, reporte su comprobante para la validación manual.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {paymentMethods.map(m => (
+                  <div key={m.id} className="p-8 rounded-[2.5rem] border-2 bg-slate-50 dark:bg-slate-900 flex flex-col items-center gap-6 transition-all hover:bg-white dark:hover:bg-slate-950 hover:shadow-2xl hover:border-primary/20 group">
+                     <div className="p-5 bg-white dark:bg-slate-800 rounded-2xl text-primary border shadow-sm group-hover:scale-110 transition-transform">
+                       {m.type === 'qr' ? <QrCode className="w-8 h-8" /> : <Building2 className="w-8 h-8" />}
+                     </div>
+                     <div className="text-center w-full space-y-3">
+                        <p className="text-[11px] font-black uppercase text-muted-foreground tracking-widest leading-none">{m.label}</p>
+                        <p className="text-2xl font-black text-slate-900 dark:text-white break-all leading-tight">{m.value}</p>
+                        {m.qrImage && (
+                          <div className="mt-8 p-6 bg-white rounded-[2rem] inline-block border-2 border-primary/10 shadow-2xl group-hover:border-primary/40 transition-colors">
+                            <img src={m.qrImage} className="w-64 h-64 object-contain mx-auto" alt="QR Scan" />
+                            <div className="mt-4 py-3 bg-primary text-white rounded-xl">
+                               <p className="text-[10px] font-black uppercase tracking-widest">Escanear QR</p>
+                            </div>
+                          </div>
+                        )}
+                     </div>
+                  </div>
+                ))}
+              </div>
+              <div className="pt-10 border-t space-y-8">
+                <p className="text-[11px] font-black text-center text-muted-foreground uppercase tracking-[0.4em]">Reportar Pago vía WhatsApp</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  <a href="https://wa.me/51929110834" target="_blank" className="h-20 bg-emerald-600 text-white rounded-3xl font-black text-xs flex items-center justify-center gap-4 shadow-xl shadow-emerald-500/20 hover:bg-emerald-700 transition-all active:scale-95 uppercase tracking-widest px-8">
+                     <MessageCircle className="w-8 h-8" /> Soporte Admin 1
+                  </a>
+                  <a href="https://wa.me/51942239654" target="_blank" className="h-20 bg-emerald-600 text-white rounded-3xl font-black text-xs flex items-center justify-center gap-4 shadow-xl shadow-emerald-500/20 hover:bg-emerald-700 transition-all active:scale-95 uppercase tracking-widest px-8">
+                     <MessageCircle className="w-8 h-8" /> Soporte Admin 2
+                  </a>
                 </div>
-              ))}
-            </div>
-            <div className="pt-8 border-t space-y-6">
-              <p className="text-[10px] font-black text-center text-muted-foreground uppercase tracking-[0.3em]">Enviar comprobante a:</p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <a href="https://wa.me/51929110834" target="_blank" className="h-16 bg-emerald-600 text-white rounded-2xl font-black text-xs flex items-center justify-center gap-3 shadow-xl shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-95 uppercase px-4">
-                   <MessageCircle className="w-6 h-6" /> WhatsApp Adm. 1
-                </a>
-                <a href="https://wa.me/51942239654" target="_blank" className="h-16 bg-emerald-600 text-white rounded-2xl font-black text-xs flex items-center justify-center gap-3 shadow-xl shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-95 uppercase px-4">
-                   <MessageCircle className="w-6 h-6" /> WhatsApp Adm. 2
-                </a>
               </div>
             </div>
           </DialogContent>
@@ -392,42 +413,42 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           }}
         >
           <DialogContent 
-            className="sm:max-w-2xl rounded-3xl border-amber-200 dark:border-amber-900 shadow-2xl"
+            className="sm:max-w-2xl rounded-[3rem] border-none shadow-[0_35px_60px_-15px_rgba(0,0,0,0.4)] p-0 overflow-hidden"
             onPointerDownOutside={(e) => e.preventDefault()}
             onEscapeKeyDown={(e) => e.preventDefault()}
           >
-            <DialogHeader className="text-center">
-              <div className="w-16 h-16 bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                <AlertCircle className="w-10 h-10" />
+            <div className="bg-amber-500 h-3" />
+            <div className="p-12 text-center space-y-8">
+              <div className="w-24 h-24 bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-500 rounded-[2rem] flex items-center justify-center mx-auto shadow-inner">
+                <AlertCircle className="w-12 h-12" />
               </div>
-              <DialogTitle className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight">Recordatorio de Pago Pendiente</DialogTitle>
-              <DialogDescription className="text-sm font-medium text-slate-600 dark:text-slate-400 mt-2">
-                Su servicio se encuentra en periodo de mora. Regularice su pago para evitar la suspensión definitiva de sus módulos odontológicos.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="py-6 space-y-6">
-              <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800 p-4 rounded-2xl flex items-center justify-between">
-                <div>
-                  <p className="text-[10px] font-black text-amber-800 dark:text-amber-300 uppercase tracking-widest">Monto de Mensualidad</p>
-                  <p className="text-2xl font-black text-amber-600 dark:text-amber-500">S/. {user.subscriptionFee?.toFixed(2)}</p>
+              <div className="space-y-3">
+                <DialogTitle className="text-3xl font-black text-slate-900 dark:text-white uppercase tracking-tighter">Aviso de Mora</DialogTitle>
+                <DialogDescription className="text-lg font-bold text-slate-600 dark:text-slate-400 leading-relaxed">
+                  Su suscripción se encuentra vencida. Por favor regularice su pago para evitar la suspensión inmediata.
+                </DialogDescription>
+              </div>
+              <div className="bg-amber-50 dark:bg-amber-900/20 border-2 border-amber-100 dark:border-amber-800 p-8 rounded-[2rem] flex items-center justify-between shadow-inner">
+                <div className="text-left">
+                  <p className="text-[11px] font-black text-amber-800 dark:text-amber-300 uppercase tracking-widest">Monto Pendiente</p>
+                  <p className="text-4xl font-black text-amber-600 dark:text-amber-500 mt-1">S/. {user.subscriptionFee?.toFixed(2)}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-[10px] font-black text-amber-800 dark:text-amber-300 uppercase tracking-widest">Estado</p>
-                  <Badge className="bg-amber-500 font-black">EN MORA</Badge>
+                  <Badge className="bg-amber-500 font-black text-[10px] px-4 py-1.5 uppercase tracking-tighter">EN MORA</Badge>
                 </div>
               </div>
+              <DialogFooter className="flex flex-col sm:flex-row gap-4 pt-6 border-t items-center">
+                <div className="flex-1 flex items-center gap-3 text-muted-foreground">
+                  <Timer className="w-5 h-5 text-amber-500" />
+                  <span className="text-xs font-black uppercase tracking-widest">
+                    {moraCountdown > 0 ? `Disponible en ${moraCountdown}s` : 'Ya puede continuar'}
+                  </span>
+                </div>
+                <Button onClick={() => setIsMoraReminderOpen(false)} disabled={moraCountdown > 0} className="w-full sm:w-56 h-14 font-black rounded-2xl shadow-xl shadow-amber-500/10 uppercase tracking-widest transition-transform active:scale-95">
+                  Entendido
+                </Button>
+              </DialogFooter>
             </div>
-            <DialogFooter className="flex flex-col sm:flex-row gap-3 pt-4 border-t">
-              <div className="flex-1 flex items-center gap-2 text-muted-foreground">
-                <Timer className="w-4 h-4" />
-                <span className="text-xs font-bold uppercase tracking-widest">
-                  {moraCountdown > 0 ? `Cerrar en ${moraCountdown}s` : 'Ya puede cerrar este aviso'}
-                </span>
-              </div>
-              <Button onClick={() => setIsMoraReminderOpen(false)} disabled={moraCountdown > 0} className="w-full sm:w-48 h-12 font-black rounded-xl">
-                Entendido
-              </Button>
-            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
