@@ -193,7 +193,7 @@ function ClinicDashboard() {
     { icon: Calendar, title: 'Citas', description: 'Agenda y Turnos', href: '/appointments', color: 'bg-violet-600' },
     { icon: Boxes, title: 'Inventario', description: 'Control de Insumos', href: '/inventory', color: 'bg-orange-600' },
     { icon: Users, title: 'Personal', description: 'Equipo Clínico', href: '/admin/users', color: 'bg-slate-600' },
-    { icon: DatabaseIcon, title: 'Respaldo', description: 'Backup de Datos', href: '/backups', show: user?.role === 'clinic' },
+    { icon: DatabaseIcon, title: 'Respaldo', description: 'Backup de Datos', href: '/backups', show: user?.role === 'clinic', color: 'bg-slate-600' },
   ];
 
   const brandColor = user?.primaryColor || '#008080';
@@ -240,22 +240,29 @@ function ClinicDashboard() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {modules.filter(m => m.show !== false).map((module) => (
-          <Link href={module.href} key={module.href}>
-            <Card className="hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 border-none shadow-xl shadow-slate-200/50 dark:shadow-none bg-white dark:bg-slate-950 group cursor-pointer overflow-hidden h-full rounded-[2.5rem]">
-              <div className={`h-2 ${module.color}`} />
-              <CardHeader className="flex flex-row items-center gap-5 py-8 p-6">
-                <div className={`p-4 rounded-[1.5rem] text-white ${module.color} shadow-lg shadow-${module.color.split('-')[1]}-500/20 group-hover:rotate-6 transition-all duration-500`}>
-                  <module.icon className="w-7 h-7" />
-                </div>
-                <div className="space-y-1">
-                  <CardTitle className="text-lg font-black tracking-tight">{module.title}</CardTitle>
-                  <CardDescription className="text-xs font-medium leading-snug">{module.description}</CardDescription>
-                </div>
-              </CardHeader>
-            </Card>
-          </Link>
-        ))}
+        {modules.filter(m => m.show !== false).map((module) => {
+          const colorName = module.color?.split('-')[1] || 'primary';
+          return (
+            <Link href={module.href} key={module.href}>
+              <Card className="hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 border-none shadow-xl shadow-slate-200/50 dark:shadow-none bg-white dark:bg-slate-950 group cursor-pointer overflow-hidden h-full rounded-[2.5rem]">
+                <div className={`h-2 ${module.color}`} />
+                <CardHeader className="flex flex-row items-center gap-5 py-8 p-6">
+                  <div className={cn(
+                    "p-4 rounded-[1.5rem] text-white shadow-lg group-hover:rotate-6 transition-all duration-500",
+                    module.color,
+                    `shadow-${colorName}-500/20`
+                  )}>
+                    <module.icon className="w-7 h-7" />
+                  </div>
+                  <div className="space-y-1">
+                    <CardTitle className="text-lg font-black tracking-tight">{module.title}</CardTitle>
+                    <CardDescription className="text-xs font-medium leading-snug">{module.description}</CardDescription>
+                  </div>
+                </CardHeader>
+              </Card>
+            </Link>
+          );
+        })}
       </div>
 
       <div className="flex justify-between items-center bg-slate-50 dark:bg-slate-900 p-8 rounded-[3rem] border border-dashed border-slate-200 dark:border-slate-800">
