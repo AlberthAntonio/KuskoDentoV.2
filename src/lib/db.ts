@@ -25,6 +25,7 @@ export interface User {
   paymentFrequency?: 'monthly' | 'yearly';
   subscriptionStatus: 'active' | 'suspended' | 'blocked';
   registeredByAdminId?: string;
+  primaryColor?: string; // Campo para personalización de color
 }
 
 export interface Patient {

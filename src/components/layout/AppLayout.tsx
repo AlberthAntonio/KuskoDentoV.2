@@ -14,6 +14,34 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 
+// Función para convertir HEX a HSL (formato ShadCN)
+function hexToHsl(hex: string) {
+  let r = 0, g = 0, b = 0;
+  if (hex.length === 4) {
+    r = parseInt(hex[1] + hex[1], 16);
+    g = parseInt(hex[2] + hex[2], 16);
+    b = parseInt(hex[3] + hex[3], 16);
+  } else if (hex.length === 7) {
+    r = parseInt(hex.substring(1, 3), 16);
+    g = parseInt(hex.substring(3, 5), 16);
+    b = parseInt(hex.substring(5, 7), 16);
+  }
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let h = 0, s = 0, l = (max + min) / 2;
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+      case g: h = (b - r) / d + 2; break;
+      case b: h = (r - g) / d + 4; break;
+    }
+    h /= 6;
+  }
+  return `${Math.round(h * 360)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`;
+}
+
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
   const pathname = usePathname();
@@ -42,7 +70,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   // Hook 1: Carga de métodos de pago
   useEffect(() => {
-    if (user && user.role === 'clinic') {
+    if (user && (user.role === 'clinic' || user.role === 'doctor')) {
       db.getAll<PaymentMethod>('payment_methods').then(setPaymentMethods);
     }
   }, [user]);
@@ -72,6 +100,24 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     }
     return () => clearInterval(timer);
   }, [isMoraReminderOpen, moraCountdown]);
+
+  // Hook 4: Inyección dinámica de colores de marca
+  useEffect(() => {
+    if (user?.primaryColor) {
+      const hslValue = hexToHsl(user.primaryColor);
+      const style = document.createElement('style');
+      style.innerHTML = `
+        :root {
+          --primary: ${hslValue} !important;
+          --ring: ${hslValue} !important;
+        }
+      `;
+      document.head.appendChild(style);
+      return () => {
+        document.head.removeChild(style);
+      };
+    }
+  }, [user?.primaryColor]);
 
   // Validación de sesión (Después de todos los hooks)
   if (!user) return null;
@@ -114,8 +160,16 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       <div className="flex h-screen w-full overflow-hidden">
         <Sidebar variant="inset" className="border-r">
           <SidebarHeader className="p-6">
-            <h1 className="text-2xl font-bold text-primary tracking-tight">KuskoDento</h1>
-            <p className="text-xs text-muted-foreground">Gestión Odontológica</p>
+            {user.photo ? (
+              <div className="h-12 w-full flex items-center justify-center overflow-hidden">
+                <img src={user.photo} className="max-h-full max-w-full object-contain" alt="Logo de la Clínica" />
+              </div>
+            ) : (
+              <>
+                <h1 className="text-2xl font-bold text-primary tracking-tight">KuskoDento</h1>
+                <p className="text-xs text-muted-foreground">Gestión Odontológica</p>
+              </>
+            )}
           </SidebarHeader>
           <SidebarContent>
             <SidebarMenu className="px-4">

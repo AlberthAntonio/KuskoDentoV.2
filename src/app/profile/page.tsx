@@ -10,11 +10,12 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Lock, ShieldCheck, AlertCircle, User as UserIcon, QrCode, Building2, Plus, Trash2, Camera, Wallet, Eye } from 'lucide-react';
+import { Lock, ShieldCheck, AlertCircle, User as UserIcon, QrCode, Building2, Plus, Trash2, Camera, Wallet, Eye, Palette, Check } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { cn } from '@/lib/utils';
 
 function ProfileContent() {
   const { user, logout } = useAuth();
@@ -25,8 +26,14 @@ function ProfileContent() {
     confirm: ''
   });
   const [isChanging, setIsChanging] = useState(false);
+  const [isSavingTheme, setIsSavingTheme] = useState(false);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [isMethodOpen, setIsMethodOpen] = useState(false);
+  
+  // Estados para personalización
+  const [primaryColor, setPrimaryColor] = useState(user?.primaryColor || '#008080');
+  const [photoPreview, setPhotoPreview] = useState<string | null>(user?.photo || null);
+
   const [newMethod, setNewMethod] = useState<Partial<PaymentMethod>>({
     type: 'bank',
     label: '',
@@ -48,6 +55,7 @@ function ProfileContent() {
   if (!user) return null;
 
   const isAdmin = user.role === 'admin';
+  const isClinic = user.role === 'clinic';
 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -78,6 +86,35 @@ function ProfileContent() {
       toast({ variant: 'destructive', title: 'Error', description: 'No se pudo actualizar la contraseña.' });
     } finally {
       setIsChanging(false);
+    }
+  };
+
+  const handleSaveTheme = async () => {
+    if (!user) return;
+    setIsSavingTheme(true);
+    try {
+      const updatedUser: User = { 
+        ...user, 
+        primaryColor: primaryColor,
+        photo: photoPreview || undefined 
+      };
+      await db.put('users', updatedUser);
+      toast({ title: "Personalización Guardada", description: "Los cambios se aplicarán en el próximo reinicio o al refrescar." });
+      // Forzar recarga para aplicar CSS inyectado
+      setTimeout(() => window.location.reload(), 1500);
+    } catch (e) {
+      toast({ variant: 'destructive', title: "Error", description: "No se pudieron guardar los cambios." });
+    } finally {
+      setIsSavingTheme(false);
+    }
+  };
+
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => setPhotoPreview(reader.result as string);
+      reader.readAsDataURL(file);
     }
   };
 
@@ -119,7 +156,7 @@ function ProfileContent() {
         <div className="flex justify-between items-center">
           <div>
             <h2 className="text-3xl font-bold text-primary">Configuración de Perfil</h2>
-            <p className="text-muted-foreground mt-2">Gestiona tu seguridad y datos del sistema</p>
+            <p className="text-muted-foreground mt-2">Gestiona tu seguridad y la identidad de tu consultorio</p>
           </div>
           {isAdmin && (
             <Badge className="bg-primary/10 text-primary border-primary/20 h-8 px-4 text-xs font-bold uppercase tracking-widest">
@@ -131,6 +168,9 @@ function ProfileContent() {
         <Tabs defaultValue="security" className="space-y-6">
           <TabsList className="bg-muted p-1 rounded-xl h-auto">
             <TabsTrigger value="security" className="py-2.5 px-6 gap-2"><Lock className="w-4 h-4" /> Seguridad</TabsTrigger>
+            {isClinic && (
+              <TabsTrigger value="appearance" className="py-2.5 px-6 gap-2"><Palette className="w-4 h-4" /> Personalización de Marca</TabsTrigger>
+            )}
             {isAdmin && (
               <TabsTrigger value="billing" className="py-2.5 px-6 gap-2"><Wallet className="w-4 h-4" /> Medios de Pago del Sistema</TabsTrigger>
             )}
@@ -220,6 +260,96 @@ function ProfileContent() {
               </Card>
             </div>
           </TabsContent>
+
+          {isClinic && (
+            <TabsContent value="appearance">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <Card className="border-none shadow-sm overflow-hidden bg-white/50 backdrop-blur-sm">
+                  <CardHeader>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Palette className="w-5 h-5 text-primary" /> Identidad Visual
+                    </CardTitle>
+                    <CardDescription>Personaliza los colores y el logo de tu consultorio en el sistema.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div className="space-y-4">
+                      <Label className="font-bold">Logo del Consultorio (Sidebar)</Label>
+                      <div className="flex flex-col items-center gap-4 p-6 border-2 border-dashed rounded-3xl bg-slate-50">
+                        <div className="w-48 h-20 bg-white rounded-xl shadow-inner border flex items-center justify-center overflow-hidden">
+                          {photoPreview ? (
+                            <img src={photoPreview} className="max-w-full max-h-full object-contain" />
+                          ) : (
+                            <Building2 className="w-10 h-10 opacity-20" />
+                          )}
+                        </div>
+                        <Input type="file" accept="image/*" onChange={handlePhotoUpload} className="h-10 cursor-pointer" />
+                        <p className="text-[9px] text-muted-foreground text-center uppercase font-bold tracking-widest">
+                          Recomendado: Imagen horizontal con fondo transparente (PNG)
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <Label className="font-bold">Color Primario del Sistema</Label>
+                      <div className="flex items-center gap-6">
+                        <div 
+                          className="w-16 h-16 rounded-2xl shadow-lg border-4 border-white"
+                          style={{ backgroundColor: primaryColor }}
+                        />
+                        <div className="flex-1">
+                          <Input 
+                            type="color" 
+                            value={primaryColor} 
+                            onChange={(e) => setPrimaryColor(e.target.value)} 
+                            className="h-12 w-full cursor-pointer p-1 rounded-xl"
+                          />
+                          <p className="text-[10px] text-muted-foreground mt-2 font-bold">Selecciona el color que mejor represente a tu clínica.</p>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                  <CardFooter className="pt-0 pb-6 px-6">
+                    <Button onClick={handleSaveTheme} className="w-full h-12 text-lg font-bold rounded-xl shadow-lg shadow-primary/20" disabled={isSavingTheme}>
+                      {isSavingTheme ? 'Guardando...' : 'Aplicar Personalización'}
+                    </Button>
+                  </CardFooter>
+                </Card>
+
+                <Card className="border-none shadow-sm bg-white/50 backdrop-blur-sm">
+                  <CardHeader>
+                    <CardTitle className="text-lg">Previsualización</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="border rounded-2xl overflow-hidden shadow-xl">
+                      <div className="h-10 border-b flex items-center px-4 bg-white">
+                        <div className="w-3 h-3 rounded-full bg-red-400 mr-2" />
+                        <div className="w-3 h-3 rounded-full bg-amber-400 mr-2" />
+                        <div className="w-3 h-3 rounded-full bg-emerald-400" />
+                      </div>
+                      <div className="flex h-64">
+                        <div className="w-16 border-r flex flex-col items-center py-4 gap-4" style={{ backgroundColor: primaryColor + '10' }}>
+                           <div className="w-8 h-8 rounded-lg" style={{ backgroundColor: primaryColor }} />
+                           <div className="w-8 h-2 rounded bg-slate-200" />
+                           <div className="w-8 h-2 rounded bg-slate-200" />
+                        </div>
+                        <div className="flex-1 p-6 space-y-4 bg-white">
+                           <div className="h-4 w-3/4 rounded" style={{ backgroundColor: primaryColor + '20' }} />
+                           <div className="grid grid-cols-2 gap-4">
+                              <div className="h-20 rounded-xl" style={{ backgroundColor: primaryColor }} />
+                              <div className="h-20 rounded-xl border-2" style={{ borderColor: primaryColor + '40' }} />
+                           </div>
+                           <div className="h-10 w-full rounded-xl" style={{ backgroundColor: primaryColor }} />
+                        </div>
+                      </div>
+                    </div>
+                    <p className="text-center mt-6 text-xs font-bold text-muted-foreground italic">
+                      "La identidad de tu clínica inspira confianza en tus pacientes."
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+          )}
 
           {isAdmin && (
             <TabsContent value="billing">
