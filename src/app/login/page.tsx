@@ -97,7 +97,7 @@ function LoginContent() {
               />
             </div>
             <div className="space-y-3">
-              <Label htmlFor="password" throws-error className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Contraseña</Label>
+              <Label htmlFor="password" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Contraseña</Label>
               <Input 
                 id="password" 
                 type="password" 
