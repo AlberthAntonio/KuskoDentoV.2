@@ -8,42 +8,38 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Button } from '@/components/ui/button';
 import { Users, UserSquare2, Stethoscope, Landmark, Activity, Calendar, Database as DatabaseIcon, ShieldCheck, Clock, AlertCircle, Boxes, Sparkles, TrendingUp, ArrowUpRight, Zap } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { db, User, Patient, Appointment } from '@/lib/legacy-data';
+import { db, Patient, Appointment } from '@/lib/legacy-data';
 import Link from 'next/link';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
 import { cn } from '@/lib/utils';
+import { useApi } from '@/hooks/use-api';
+import type { AdminReportsPayload, AdminUser } from '@/types/admin';
 
 function AdminDashboard() {
-  const [stats, setStats] = useState({
-    totalClinics: 0,
-    activeClinics: 0,
-    inactiveClinics: 0,
-    totalPatients: 0,
-    totalAppointments: 0
-  });
+  const { data: reportsData, loading: reportsLoading, error: reportsError } = useApi<AdminReportsPayload>('/api/admin/reports');
+  const { data: clinicsPayload, loading: clinicsLoading, error: clinicsError } = useApi<{ items: AdminUser[] }>('/api/admin/users');
 
-  const [recentClinics, setRecentClinics] = useState<User[]>([]);
+  const allClinics = clinicsPayload?.items ?? [];
+  const activeClinics = allClinics.filter((c) => c.subscriptionStatus === 'active').length;
+  const inactiveClinics = allClinics.filter((c) => c.subscriptionStatus !== 'active').length;
 
-  useEffect(() => {
-    loadStats();
-  }, []);
-
-  const loadStats = async () => {
-    const users = await db.getAll<User>('users');
-    const clinics = users.filter(u => u.role === 'clinic');
-    const patients = await db.getAll<Patient>('patients');
-    const appointments = await db.getAll<Appointment>('appointments');
-
-    setStats({
-      totalClinics: clinics.length,
-      activeClinics: clinics.filter(c => c.status === 'active').length,
-      inactiveClinics: clinics.filter(c => c.status !== 'active').length,
-      totalPatients: patients.length,
-      totalAppointments: appointments.length
-    });
-
-    setRecentClinics(clinics.slice(-3).reverse());
+  const stats = {
+    totalClinics: reportsData?.stats.totalClinics ?? allClinics.length,
+    activeClinics,
+    inactiveClinics,
+    totalPatients: reportsData?.stats.totalPatients ?? 0,
+    totalAppointments: reportsData?.stats.totalAppointments ?? 0,
   };
+
+  const recentClinics = allClinics.slice(0, 3);
+
+  if (reportsLoading || clinicsLoading) {
+    return <div className="py-16 text-center text-sm text-muted-foreground">Cargando panel administrativo...</div>;
+  }
+
+  if (reportsError || clinicsError) {
+    return <div className="py-16 text-center text-sm text-destructive">{reportsError || clinicsError}</div>;
+  }
 
   const chartData = [
     { name: 'Activos', count: stats.activeClinics, fill: 'hsl(var(--primary))' },
@@ -174,14 +170,41 @@ function ClinicDashboard() {
 
   const loadClinicData = async () => {
     if (!user) return;
-    const cid = user.role === 'clinic' ? user.id : user.clinicId;
+    const cid = user.clinicId || user.clinic_id;
+    if (!cid) return;
+
+    const now = new Date();
+    const normalizeTime = (value?: string) => {
+      if (!value) return '00:00';
+      const match = value.match(/^(\d{1,2}):(\d{2})/);
+      if (!match) return '00:00';
+      return `${match[1].padStart(2, '0')}:${match[2]}`;
+    };
+
+    const resolveAppointmentDate = (appointment: Appointment): Date | null => {
+      const sourceDate = appointment.scheduledAt || appointment.date;
+      if (!sourceDate) return null;
+
+      const datePart = sourceDate.includes('T') ? sourceDate.split('T')[0] : sourceDate;
+      const parsed = new Date(`${datePart}T${normalizeTime(appointment.time)}:00`);
+      return Number.isNaN(parsed.getTime()) ? null : parsed;
+    };
+
     const allP = await db.getAll<Patient>('patients');
     const allA = await db.getAll<Appointment>('appointments');
     const allI = await db.getAll<any>('inventory');
 
+    const clinicPatients = allP.filter((p) => p.clinicId === cid);
+    const clinicAppointments = allA.filter(a => a.clinicId === cid);
+    const pendingAppointments = clinicAppointments.filter((appointment) => {
+      if (appointment.status !== 'Asignado') return false;
+      const appointmentDate = resolveAppointmentDate(appointment);
+      return appointmentDate ? appointmentDate >= now : true;
+    });
+
     setClinicStats({
-      patients: allP.filter(p => p.clinicId === cid).length,
-      appointments: allA.filter(a => a.clinicId === cid).length,
+      patients: clinicPatients.length,
+      appointments: pendingAppointments.length,
       lowStock: allI.filter(i => i.clinicId === cid && i.quantity <= i.minQuantity).length
     });
   };

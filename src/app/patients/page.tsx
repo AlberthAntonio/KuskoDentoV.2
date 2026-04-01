@@ -315,7 +315,7 @@ function PatientsContent() {
             <Search className="absolute left-4 top-3.5 h-5 w-5 text-muted-foreground" />
             <Input
               placeholder="Buscar por DNI o nombre..."
-              className="pl-12 h-12 rounded-2xl bg-slate-50 border-none shadow-inner text-base"
+              className="pl-12 h-12 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border-none shadow-inner text-base"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -323,7 +323,7 @@ function PatientsContent() {
 
           <div className="border rounded-[1.5rem] overflow-hidden">
             <Table>
-              <TableHeader className="bg-slate-50/50">
+              <TableHeader className="bg-slate-50/50 dark:bg-slate-800/80">
                 <TableRow>
                   <TableHead className="font-black uppercase text-[10px] tracking-widest">Documento</TableHead>
                   <TableHead className="font-black uppercase text-[10px] tracking-widest">Paciente</TableHead>
@@ -337,9 +337,9 @@ function PatientsContent() {
                   filteredPatients.map((p) => {
                     const nameData = splitName(p.full_name);
                     return (
-                      <TableRow key={p.id} className="group hover:bg-slate-50 transition-colors">
+                      <TableRow key={p.id} className="group hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors">
                         <TableCell className="font-mono text-xs">{p.dni}</TableCell>
-                        <TableCell className="font-black text-slate-800">
+                        <TableCell className="font-black text-slate-800 dark:text-slate-100">
                           {nameData.lastNames ? `${nameData.lastNames}, ${nameData.names}` : p.full_name}
                         </TableCell>
                         <TableCell className="text-sm font-medium">{p.phone}</TableCell>
@@ -359,7 +359,7 @@ function PatientsContent() {
                               variant="ghost"
                               size="icon"
                               onClick={() => handleDeleteRequest(p.id)}
-                              className="h-9 w-9 text-destructive opacity-0 group-hover:opacity-100 transition-opacity rounded-xl hover:bg-red-50"
+                              className="h-9 w-9 text-destructive opacity-0 group-hover:opacity-100 transition-opacity rounded-xl hover:bg-red-50 dark:hover:bg-red-950/40"
                             >
                               <Trash2 className="w-4 h-4" />
                             </Button>
@@ -370,7 +370,7 @@ function PatientsContent() {
                   })
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-24 text-muted-foreground bg-slate-50/30">
+                    <TableCell colSpan={5} className="text-center py-24 text-muted-foreground bg-slate-50/30 dark:bg-slate-800/40">
                       <UserPlus className="w-12 h-12 mx-auto mb-4 opacity-10" />
                       <p className="font-bold uppercase tracking-widest text-xs">No se encontraron registros</p>
                     </TableCell>
@@ -405,7 +405,7 @@ function PatientsContent() {
                 value={confirmWord}
                 onChange={(e) => setConfirmWord(e.target.value)}
                 placeholder="ELIMINAR"
-                className="h-12 rounded-xl bg-slate-50 focus:bg-white transition-all border-none shadow-inner"
+                className="h-12 rounded-xl bg-slate-50 dark:bg-slate-800/80 focus:bg-white dark:focus:bg-slate-700 transition-all border-none shadow-inner"
               />
             </div>
           </div>

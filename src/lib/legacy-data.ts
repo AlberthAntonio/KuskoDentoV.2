@@ -146,6 +146,7 @@ export interface Appointment {
   doctorId: string;
   doctorName: string;
   date: string;
+  scheduledAt?: string;
   time: string;
   status: 'Asignado' | 'Atendido';
   cost: number;
@@ -304,6 +305,7 @@ export const db = {
       if (table === 'appointments') {
         const data = await apiGet<{ items?: Array<{
           id: string;
+          clinic_id: string;
           patient_id: string;
           treatment_id?: string | null;
           doctor?: { full_name?: string | null } | null;
@@ -316,11 +318,13 @@ export const db = {
 
         const items = (data.items || []).map((item) => ({
           id: item.id,
+          clinicId: item.clinic_id,
           patientId: item.patient_id,
           treatmentId: item.treatment_id || '',
           doctorId: '',
           doctorName: item.doctor?.full_name || 'No asignado',
           date: toDate(item.date),
+          scheduledAt: item.date,
           time: item.time,
           status: item.status === 'completed' ? 'Atendido' : 'Asignado',
           cost: toNumber(item.cost),
@@ -333,6 +337,7 @@ export const db = {
       if (table === 'patients') {
         const data = await apiGet<{ items?: Array<{
           id: string;
+          clinic_id: string;
           dni: string;
           full_name: string;
           email?: string | null;
@@ -357,6 +362,7 @@ export const db = {
             email: item.email || undefined,
             phone: item.phone,
             address: item.address,
+            clinicId: item.clinic_id,
             registrationDate: toDate(item.created_at),
             attendedBy: undefined,
             underTreatment: Boolean(item.under_treatment),

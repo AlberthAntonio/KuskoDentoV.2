@@ -44,6 +44,12 @@ function parseDate(value?: string): Date | undefined {
   return parsed;
 }
 
+function addMonthsSafe(base: Date, months: number): Date {
+  const date = new Date(base);
+  date.setMonth(date.getMonth() + Math.max(1, months));
+  return date;
+}
+
 function toDateOnly(value?: Date | null): string | undefined {
   if (!value) return undefined;
   return value.toISOString().split('T')[0];
@@ -268,7 +274,7 @@ export const adminService = {
       const domain = await uniqueDomain(username || fullName);
       const createdBy = actor.username ?? actor.email ?? actor.id;
       const contractStartDate = parseDate(input.contractStartDate);
-      const nextPaymentDate = parseDate(input.nextPaymentDate);
+      const nextPaymentDate = parseDate(input.nextPaymentDate) ?? (contractStartDate ? addMonthsSafe(contractStartDate, 1) : undefined);
       const passwordHash = await hashPassword(password);
 
       const created = await prisma.$transaction(async (tx) => {
@@ -402,6 +408,7 @@ export const adminService = {
 
       const parsedNextDate = parseDate(input.nextPaymentDate);
       const parsedContractStart = parseDate(input.contractStartDate);
+      const resolvedNextPaymentDate = parsedNextDate ?? (parsedContractStart ? addMonthsSafe(parsedContractStart, 1) : undefined);
       const updatedBy = actor.username ?? actor.email ?? actor.id;
 
       await prisma.clinic.update({
@@ -411,7 +418,7 @@ export const adminService = {
           address: clean(input.address) ?? clinic.address,
           logo_url: clean(input.photo) ?? clinic.logo_url,
           subscription_status: input.subscriptionStatus ?? clinic.subscription_status,
-          next_payment_date: parsedNextDate ?? clinic.next_payment_date,
+          next_payment_date: resolvedNextPaymentDate ?? clinic.next_payment_date,
           contract_start_date: parsedContractStart ?? clinic.contract_start_date,
           created_by: clinic.created_by ?? updatedBy,
         },
