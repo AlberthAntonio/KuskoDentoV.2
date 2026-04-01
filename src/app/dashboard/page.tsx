@@ -8,7 +8,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Button } from '@/components/ui/button';
 import { Users, UserSquare2, Stethoscope, Landmark, Activity, Calendar, Database as DatabaseIcon, ShieldCheck, Clock, AlertCircle, Boxes, Sparkles, TrendingUp, ArrowUpRight, Zap } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { db, User, Patient, Appointment } from '@/lib/db';
+import { db, User, Patient, Appointment } from '@/lib/legacy-data';
 import Link from 'next/link';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
 import { cn } from '@/lib/utils';

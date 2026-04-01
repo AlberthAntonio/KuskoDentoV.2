@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from '@/hooks/use-auth';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { db, PaymentMethod } from '@/lib/db';
+import { db, PaymentMethod } from '@/lib/legacy-data';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';

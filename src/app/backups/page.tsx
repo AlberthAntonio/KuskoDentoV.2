@@ -4,7 +4,7 @@
 import { useState } from 'react';
 import { AuthProvider, useAuth } from '@/hooks/use-auth';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { db } from '@/lib/db';
+import { db } from '@/lib/legacy-data';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';

@@ -3,6 +3,10 @@ import { apiError, apiOk } from '@/lib/api-response';
 import { getRequestContext } from '@/lib/request-context';
 import { patientService } from '@/services/patient.service';
 
+function resolvePatientErrorStatus(message: string): number {
+  return message.toLowerCase().includes('no encontrado') ? 404 : 500;
+}
+
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { clinicId } = await getRequestContext();
@@ -33,7 +37,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     return apiOk(updated);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Error interno';
-    const status = message === 'Paciente no encontrado' ? 404 : 500;
+    const status = resolvePatientErrorStatus(message);
     return apiError(message, status);
   }
 }
@@ -48,7 +52,7 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
     return apiOk(result);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Error interno';
-    const status = message === 'Paciente no encontrado' ? 404 : 500;
+    const status = resolvePatientErrorStatus(message);
     return apiError(message, status);
   }
 }

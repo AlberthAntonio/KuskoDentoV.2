@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { AuthProvider } from '@/hooks/use-auth';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { db, Consent, Patient } from '@/lib/db';
+import { db, Consent, Patient } from '@/lib/legacy-data';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Search, FileText, Plus, User, Calendar, FileCheck } from 'lucide-react';
 import { Input } from '@/components/ui/input';

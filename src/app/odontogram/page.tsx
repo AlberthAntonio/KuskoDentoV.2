@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Search, UserSquare2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useState, useEffect } from 'react';
-import { db, Patient } from '@/lib/db';
+import { db, Patient } from '@/lib/legacy-data';
 import Link from 'next/link';
 
 function OdontogramContent() {
@@ -16,15 +16,13 @@ function OdontogramContent() {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [search, setSearch] = useState('');
 
-  const clinicId = user?.role === 'clinic' ? user.id : user?.clinicId;
-
   useEffect(() => {
-    if (user && clinicId) {
+    if (user) {
       db.getAll<Patient>('patients').then(all => {
-        setPatients(all.filter(p => p.clinicId === clinicId));
+        setPatients(all);
       });
     }
-  }, [user, clinicId]);
+  }, [user]);
 
   const filtered = patients.filter(p => 
     p.dni.includes(search) || p.names.toLowerCase().includes(search.toLowerCase()) || p.lastNames.toLowerCase().includes(search.toLowerCase())

@@ -2,10 +2,11 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 
 export const appointmentService = {
-  async getByClinic(clinicId: string, date?: string | null, status?: string | null) {
+  async getByClinic(clinicId: string, date?: string | null, status?: string | null, patientId?: string | null) {
     return prisma.appointment.findMany({
       where: {
         clinic_id: clinicId,
+        ...(patientId ? { patient_id: patientId } : {}),
         ...(date
           ? {
               date: {

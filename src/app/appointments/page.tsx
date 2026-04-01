@@ -344,6 +344,9 @@ function AppointmentsContent() {
               <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>Programar Cita</DialogTitle>
+                  <DialogDescription>
+                    Complete los datos del paciente y horario para registrar una nueva cita.
+                  </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleSave} className="grid grid-cols-2 gap-4 py-4">
                   <div className="col-span-2 space-y-2 relative">

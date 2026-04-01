@@ -4,16 +4,18 @@
 import { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from '@/hooks/use-auth';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { db, Treatment } from '@/lib/db';
+import { db, Treatment } from '@/lib/legacy-data';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Plus, Trash2, Edit2 } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { useToast } from '@/hooks/use-toast';
 
 function TreatmentsContent() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [treatments, setTreatments] = useState<Treatment[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [editing, setEditing] = useState<Treatment | null>(null);
@@ -27,33 +29,63 @@ function TreatmentsContent() {
 
   const load = async () => {
     if (!user || !clinicId) return;
-    const all = await db.getAll<Treatment>('treatments');
-    // Filtrar solo los tratamientos de este consultorio
-    setTreatments(all.filter(t => t.clinicId === clinicId));
+    try {
+      const all = await db.getAll<Treatment>('treatments');
+      // La API ya devuelve tratamientos del consultorio actual.
+      setTreatments(all);
+    } catch (error) {
+      toast({
+        title: 'Error al cargar tratamientos',
+        description: error instanceof Error ? error.message : 'No se pudo cargar tratamientos',
+        variant: 'destructive',
+      });
+    }
   };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!clinicId) return;
 
-    const item: Treatment = {
-      id: editing ? editing.id : crypto.randomUUID(),
-      name: form.name,
-      price: parseFloat(form.price),
-      clinicId: clinicId
-    };
+    const payload = editing
+      ? {
+          id: editing.id,
+          name: form.name,
+          price: parseFloat(form.price),
+        }
+      : {
+          name: form.name,
+          price: parseFloat(form.price),
+        };
 
-    await db.put('treatments', item);
-    setIsOpen(false);
-    setEditing(null);
-    setForm({ name: '', price: '' });
-    load();
+    try {
+      await db.put('treatments', payload);
+      setIsOpen(false);
+      setEditing(null);
+      setForm({ name: '', price: '' });
+      toast({ title: editing ? 'Tratamiento actualizado' : 'Tratamiento registrado' });
+      load();
+    } catch (error) {
+      toast({
+        title: 'No se pudo guardar',
+        description: error instanceof Error ? error.message : 'Error de registro',
+        variant: 'destructive',
+      });
+    }
   };
 
   const handleDelete = async (id: string) => {
     if (confirm('¿Eliminar este tratamiento?')) {
-      await db.delete('treatments', id);
-      load();
+      try {
+        await db.delete('treatments', id);
+        toast({ title: 'Tratamiento eliminado' });
+        load();
+      } catch (error) {
+        toast({
+          title: 'No se pudo eliminar',
+          description: error instanceof Error ? error.message : 'Error al eliminar',
+          variant: 'destructive',
+        });
+      }
     }
   };
 
@@ -81,6 +113,9 @@ function TreatmentsContent() {
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>{editing ? 'Editar Tratamiento' : 'Nuevo Tratamiento'}</DialogTitle>
+                <DialogDescription>
+                  Completa el nombre y el precio del tratamiento para guardarlo en el catalogo de la clinica.
+                </DialogDescription>
               </DialogHeader>
               <form onSubmit={handleSave} className="space-y-4 py-4">
                 <div className="space-y-2">

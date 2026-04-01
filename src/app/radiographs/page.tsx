@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react';
 import { AuthProvider } from '@/hooks/use-auth';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { db, Radiograph, Patient } from '@/lib/db';
+import { db, Radiograph, Patient } from '@/lib/legacy-data';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Search, Image as ImageIcon, ZoomIn, Calendar, User, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';

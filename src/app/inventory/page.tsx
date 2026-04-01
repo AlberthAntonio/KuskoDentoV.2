@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from '@/hooks/use-auth';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { db, InventoryItem } from '@/lib/db';
+import { db, InventoryItem } from '@/lib/legacy-data';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
@@ -41,8 +41,16 @@ function InventoryContent() {
 
   const load = async () => {
     if (!user || !clinicId) return;
-    const all = await db.getAll<InventoryItem>('inventory');
-    setItems(all.filter(i => i.clinicId === clinicId));
+    try {
+      const all = await db.getAll<InventoryItem>('inventory');
+      setItems(all.filter(i => i.clinicId === clinicId));
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Error al cargar inventario',
+        description: error instanceof Error ? error.message : 'No se pudo cargar el inventario.',
+      });
+    }
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -60,11 +68,19 @@ function InventoryContent() {
       clinicId: clinicId
     };
 
-    await db.put('inventory', newItem);
-    setIsOpen(false);
-    resetForm();
-    toast({ title: editingItem ? "Insumo Actualizado" : "Insumo Registrado" });
-    load();
+    try {
+      await db.put('inventory', newItem);
+      setIsOpen(false);
+      resetForm();
+      toast({ title: editingItem ? "Insumo Actualizado" : "Insumo Registrado" });
+      load();
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'No se pudo guardar',
+        description: error instanceof Error ? error.message : 'Error al guardar el insumo.',
+      });
+    }
   };
 
   const resetForm = () => {
@@ -92,9 +108,17 @@ function InventoryContent() {
 
   const handleDelete = async (id: string) => {
     if (confirm('¿Desea eliminar este insumo del inventario?')) {
-      await db.delete('inventory', id);
-      toast({ title: "Eliminado del inventario" });
-      load();
+      try {
+        await db.delete('inventory', id);
+        toast({ title: "Eliminado del inventario" });
+        load();
+      } catch (error) {
+        toast({
+          variant: 'destructive',
+          title: 'No se pudo eliminar',
+          description: error instanceof Error ? error.message : 'Error al eliminar el insumo.',
+        });
+      }
     }
   };
 

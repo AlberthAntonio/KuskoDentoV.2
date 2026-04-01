@@ -71,3 +71,19 @@ export const AddPaymentHistorySchema = z.object({
   payment_method: z.string().min(2),
   reference: z.string().optional(),
 });
+
+export const UpsertTreatmentSchema = z.object({
+  id: z.string().cuid().optional(),
+  name: z.string().min(2),
+  price: z.number().nonnegative(),
+});
+
+export const UpsertInventoryItemSchema = z.object({
+  id: z.string().cuid().optional(),
+  name: z.string().min(2),
+  category: z.string().optional(),
+  quantity: z.number().int().nonnegative(),
+  min_quantity: z.number().int().nonnegative(),
+  unit: z.string().optional(),
+  unit_cost: z.number().nonnegative().optional(),
+});

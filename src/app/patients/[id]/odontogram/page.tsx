@@ -4,7 +4,7 @@
 import { useState, useEffect, use } from 'react';
 import { AuthProvider, useAuth } from '@/hooks/use-auth';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { db, Patient, Odontogram } from '@/lib/db';
+import { db, Patient, Odontogram } from '@/lib/legacy-data';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, Save, RotateCcw, Info, Printer, Plus, Trash2, Edit2 } from 'lucide-react';
 import Link from 'next/link';
@@ -147,15 +147,20 @@ function OdontogramContent({ id }: { id: string }) {
   };
 
   const handleSave = async () => {
-    const od: Odontogram = { 
-      id: crypto.randomUUID(), 
-      patientId: id, 
-      data: teethData, 
-      diagnostic: diagnostic,
-      date: new Date().toISOString() 
-    };
-    await db.put('odontograms', od);
-    toast({ title: "Odontograma Guardado", description: "Se ha generado una nueva versión en el historial." });
+    try {
+      const od: Odontogram = {
+        id: crypto.randomUUID(),
+        patientId: id,
+        data: teethData,
+        diagnostic,
+        date: new Date().toISOString(),
+      };
+      await db.put('odontograms', od);
+      toast({ title: "Odontograma Guardado", description: "Se ha generado una nueva versión en el historial." });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'No se pudo guardar el odontograma';
+      toast({ title: 'Error al guardar', description: message, variant: 'destructive' });
+    }
   };
 
   const handlePrint = () => {

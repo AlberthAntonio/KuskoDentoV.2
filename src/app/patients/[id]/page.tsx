@@ -3,7 +3,7 @@
 import { useState, useEffect, use } from 'react';
 import { AuthProvider } from '@/hooks/use-auth';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { db, Patient, Radiograph, Consent, Appointment, Payment, Odontogram } from '@/lib/db';
+import { db, Patient, Radiograph, Consent, Appointment, Payment, Odontogram } from '@/lib/legacy-data';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,7 +12,131 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Calendar, CreditCard, ImageIcon, FileText, Activity, ChevronLeft, Plus, Eye, History, Upload, Trash2, Download, ZoomIn, X, FileSearch } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { PaymentModal } from '../../../components/PaymentModal';
+
+type ApiEnvelope<T> = {
+  success?: boolean;
+  data?: T;
+  error?: string;
+};
+
+async function fetchApi<T>(path: string): Promise<T> {
+  const response = await fetch(path, {
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+
+  const body = (await response.json()) as ApiEnvelope<T> | T;
+
+  if (!response.ok) {
+    const message =
+      typeof body === 'object' && body !== null && 'error' in body
+        ? String((body as { error?: string }).error || 'No se pudo cargar la informacion del paciente')
+        : 'No se pudo cargar la informacion del paciente';
+    throw new Error(message);
+  }
+
+  if (
+    typeof body === 'object' &&
+    body !== null &&
+    'success' in body &&
+    (body as ApiEnvelope<T>).success !== undefined
+  ) {
+    const wrapped = body as ApiEnvelope<T>;
+    if (!wrapped.success) {
+      throw new Error(wrapped.error || 'No se pudo cargar la informacion del paciente');
+    }
+    return wrapped.data as T;
+  }
+
+  return body as T;
+}
+
+const toNumber = (value: string | number | null | undefined): number => Number(value ?? 0);
+
+const parseDateValue = (value?: string | null): number => {
+  if (!value) return 0;
+  const parsed = new Date(value).getTime();
+  return Number.isNaN(parsed) ? 0 : parsed;
+};
+
+const toDisplayDate = (value?: string | null): string => {
+  if (!value) return '-';
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleDateString('es-PE');
+};
+
+const splitFullName = (fullName: string): { names: string; lastNames: string } => {
+  const chunks = fullName.trim().split(/\s+/).filter(Boolean);
+  if (chunks.length <= 1) {
+    return { names: chunks[0] || fullName, lastNames: '' };
+  }
+
+  return {
+    names: chunks.slice(0, -1).join(' '),
+    lastNames: chunks[chunks.length - 1],
+  };
+};
+
+type PatientApi = {
+  id: string;
+  dni: string;
+  full_name: string;
+  email?: string | null;
+  phone: string;
+  address: string;
+  created_at?: string | null;
+  under_treatment?: boolean | null;
+  prone_to_bleeding?: boolean | null;
+  allergic_to_meds?: boolean | null;
+  medical_observations?: string | null;
+};
+
+type PaymentApi = {
+  id: string;
+  patient_id: string;
+  appointment_id: string;
+  total_cost: string | number;
+  total_paid: string | number;
+  balance: string | number;
+  created_at?: string | null;
+  appointment?: { treatment?: { name?: string | null } | null } | null;
+  payment_histories?: Array<{
+    amount_paid: string | number;
+    payment_date: string;
+    payment_method?: string | null;
+  }>;
+};
+
+type AppointmentApi = {
+  id: string;
+  patient_id?: string;
+  patient?: { id?: string | null } | null;
+  treatment_id?: string | null;
+  treatment?: { name?: string | null } | null;
+  doctor_id?: string | null;
+  doctor?: { full_name?: string | null } | null;
+  date: string;
+  time: string;
+  status: string;
+  cost: string | number;
+  observations?: string | null;
+};
+
+type OdontogramApi = {
+  id: string;
+  patient_id: string;
+  appointment_id?: string | null;
+  data_json: unknown;
+  notes?: string | null;
+  created_at: string;
+};
 
 export default function PatientDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -25,30 +149,139 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
   const [odontograms, setOdontograms] = useState<Odontogram[]>([]);
   
   const [previewData, setPreviewData] = useState<{ url: string; type: string } | null>(null);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
+  const [paymentForm, setPaymentForm] = useState({ amount: '', method: 'cash', notes: '' });
+  const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
 
   useEffect(() => {
     loadAll();
   }, [id]);
 
   const loadAll = async () => {
-    const p = await db.getById<Patient>('patients', id);
-    if (!p) return;
-    setPatient(p);
+    try {
+      const [patientApi, paymentsApi, appointmentsApi, odontogramsApi] = await Promise.all([
+        fetchApi<PatientApi>(`/api/patients/${id}`),
+        fetchApi<{ items: PaymentApi[] }>(`/api/payments?patient_id=${id}`),
+        fetchApi<{ items: AppointmentApi[] }>(`/api/appointments?patient_id=${id}`),
+        fetchApi<{ items: OdontogramApi[] }>(`/api/odontograms?patient_id=${id}`),
+      ]);
 
-    const allPayments = await db.getAll<Payment>('payments');
-    setPayments((allPayments || []).filter(pay => pay.patientId === id).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+      const nameParts = splitFullName(patientApi.full_name);
+      const observations = (patientApi.medical_observations || '')
+        .split('|')
+        .map((v) => v.trim())
+        .filter(Boolean);
 
-    const allRad = await db.getAll<Radiograph>('radiographs');
-    setRadiographs((allRad || []).filter(r => r.patientId === id).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+      setPatient({
+        id: patientApi.id,
+        dni: patientApi.dni,
+        names: nameParts.names,
+        lastNames: nameParts.lastNames,
+        email: patientApi.email || undefined,
+        phone: patientApi.phone,
+        address: patientApi.address,
+        registrationDate: toDisplayDate(patientApi.created_at),
+        attendedBy: undefined,
+        underTreatment: Boolean(patientApi.under_treatment),
+        proneToBleeding: Boolean(patientApi.prone_to_bleeding),
+        allergicToMeds: Boolean(patientApi.allergic_to_meds),
+        consultationReason: observations[0] || 'No registrado',
+        diagnostic: observations.slice(1).join(' | ') || 'Evaluacion inicial',
+      });
 
-    const allConsents = await db.getAll<Consent>('consents');
-    setConsents((allConsents || []).filter(c => c.patientId === id).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+      const mappedPayments = (paymentsApi.items || [])
+        .sort((a, b) => parseDateValue(b.created_at) - parseDateValue(a.created_at))
+        .map((payment): Payment => ({
+          id: payment.id,
+          patientId: payment.patient_id,
+          appointmentId: payment.appointment_id,
+          treatmentName: payment.appointment?.treatment?.name || 'Consulta',
+          totalPaid: toNumber(payment.total_paid),
+          balance: toNumber(payment.balance),
+          totalCost: toNumber(payment.total_cost),
+          date: toDisplayDate(payment.created_at),
+          history: (payment.payment_histories || []).map((item) => ({
+            amount: toNumber(item.amount_paid),
+            date: toDisplayDate(item.payment_date),
+            method: item.payment_method || undefined,
+          })),
+        }));
 
-    const allApp = await db.getAll<Appointment>('appointments');
-    setAppointments((allApp || []).filter(a => a.patientId === id).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+      const paidAppointmentIds = new Set(
+        mappedPayments.map((payment) => payment.appointmentId).filter(Boolean)
+      );
 
-    const allOdo = await db.getAll<Odontogram>('odontograms');
-    setOdontograms((allOdo || []).filter(o => o.patientId === id).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+      const pendingFromAppointments = (appointmentsApi.items || [])
+        .filter((appointment) => {
+          const normalized = String(appointment.status || '').toLowerCase();
+          return (
+            (normalized === 'completed' || normalized === 'attended') &&
+            !paidAppointmentIds.has(appointment.id)
+          );
+        })
+        .map((appointment): Payment => ({
+          id: `pending-${appointment.id}`,
+          patientId: appointment.patient_id || appointment.patient?.id || id,
+          appointmentId: appointment.id,
+          treatmentName: appointment.treatment?.name || 'Consulta',
+          totalPaid: 0,
+          balance: toNumber(appointment.cost),
+          totalCost: toNumber(appointment.cost),
+          date: toDisplayDate(appointment.date),
+          history: [],
+        }));
+
+      setPayments(
+        [...mappedPayments, ...pendingFromAppointments].sort(
+          (a, b) => parseDateValue(b.date) - parseDateValue(a.date)
+        )
+      );
+
+      setAppointments(
+        (appointmentsApi.items || [])
+          .sort((a, b) => parseDateValue(b.date) - parseDateValue(a.date))
+          .map((appointment): Appointment => ({
+            id: appointment.id,
+            patientId: appointment.patient_id || appointment.patient?.id || '',
+            treatmentId: appointment.treatment_id || '',
+            doctorId: appointment.doctor_id || '',
+            doctorName: appointment.doctor?.full_name || 'No asignado',
+            date: toDisplayDate(appointment.date),
+            time: appointment.time,
+            status:
+              appointment.status === 'completed' || appointment.status === 'attended'
+                ? 'Atendido'
+                : 'Asignado',
+            cost: toNumber(appointment.cost),
+            observations: appointment.observations || undefined,
+          }))
+      );
+
+      // No existen endpoints REST para estos modulos en la version actual.
+      setRadiographs([]);
+      setConsents([]);
+      setOdontograms(
+        (odontogramsApi.items || [])
+          .sort((a, b) => parseDateValue(b.created_at) - parseDateValue(a.created_at))
+          .map((item): Odontogram => ({
+            id: item.id,
+            patientId: item.patient_id,
+            appointmentId: item.appointment_id || undefined,
+            data_json: item.data_json,
+            data: (item.data_json as Record<number, any>) || {},
+            diagnostic: item.notes || undefined,
+            date: item.created_at,
+          }))
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'No se pudo cargar el historial';
+      toast({
+        title: 'Error al cargar historial',
+        description: message,
+        variant: 'destructive',
+      });
+    }
   };
 
   const handleFileUpload = async (type: 'radiograph' | 'consent', e: React.ChangeEvent<HTMLInputElement>) => {
@@ -65,9 +298,17 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
     };
 
     const store = type === 'radiograph' ? 'radiographs' : 'consents';
-    await db.put(store, data);
-    toast({ title: "Archivo subido", description: "El documento se guardó correctamente." });
-    loadAll();
+    try {
+      await db.put(store, data);
+      toast({ title: "Archivo subido", description: "El documento se guardo correctamente." });
+      loadAll();
+    } catch (error) {
+      toast({
+        title: 'Modulo en migracion',
+        description: error instanceof Error ? error.message : 'Aun no se pudo guardar este archivo.',
+        variant: 'destructive',
+      });
+    }
     e.target.value = ''; 
   };
 
@@ -87,8 +328,64 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
 
   const deleteFile = async (store: 'radiographs' | 'consents', fileId: string) => {
     if (confirm("¿Eliminar este archivo permanentemente?")) {
-      await db.delete(store, fileId);
+      try {
+        await db.delete(store, fileId);
+        loadAll();
+      } catch (error) {
+        toast({
+          title: 'Modulo en migracion',
+          description: error instanceof Error ? error.message : 'Aun no se pudo eliminar este archivo.',
+          variant: 'destructive',
+        });
+      }
+    }
+  };
+
+  const openPaymentModal = (appointment: Appointment) => {
+    setSelectedAppointment(appointment);
+    setPaymentForm({ amount: appointment.cost.toFixed(2), method: 'cash', notes: '' });
+    setShowPaymentModal(true);
+  };
+
+  const submitPayment = async () => {
+    if (!selectedAppointment || !paymentForm.amount) {
+      toast({ title: 'Error', description: 'Ingrese el monto del pago', variant: 'destructive' });
+      return;
+    }
+
+    setIsSubmittingPayment(true);
+    try {
+      const response = await fetch('/api/payments', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          patient_id: id,
+          appointment_id: selectedAppointment.id,
+          amount: Number(paymentForm.amount),
+          payment_method: paymentForm.method,
+          notes: paymentForm.notes,
+          total_cost: selectedAppointment.cost,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'No se pudo registrar el pago');
+      }
+
+      toast({ title: 'Pago registrado', description: 'El pago se registró correctamente.' });
+      setShowPaymentModal(false);
+      setPaymentForm({ amount: '', method: 'cash', notes: '' });
       loadAll();
+    } catch (error) {
+      toast({
+        title: 'Error al registrar pago',
+        description: error instanceof Error ? error.message : 'No se pudo registrar el pago',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSubmittingPayment(false);
     }
   };
 
@@ -368,26 +665,44 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
             <TabsContent value="appointments">
                <Card className="border-none shadow-sm p-6">
                   <h3 className="text-xl font-bold mb-6">Agenda Histórica de Citas</h3>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Fecha / Hora</TableHead>
-                        <TableHead>Médico</TableHead>
-                        <TableHead>Estado</TableHead>
-                        <TableHead>Observaciones</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {appointments.map(a => (
-                        <TableRow key={a.id}>
-                          <TableCell className="font-medium">{a.date} - {a.time}</TableCell>
-                          <TableCell>Dr. {a.doctorName}</TableCell>
-                          <TableCell><Badge variant={a.status === 'Atendido' ? 'default' : 'secondary'}>{a.status}</Badge></TableCell>
-                          <TableCell className="text-xs italic">{a.observations || '-'}</TableCell>
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Fecha / Hora</TableHead>
+                          <TableHead>Médico</TableHead>
+                          <TableHead>Estado</TableHead>
+                          <TableHead>Costo</TableHead>
+                          <TableHead>Observaciones</TableHead>
+                          <TableHead>Acciones</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {appointments.map(a => {
+                          const hasPaidForAppointment = payments.some(p => p.appointmentId === a.id);
+                          return (
+                            <TableRow key={a.id}>
+                              <TableCell className="font-medium">{a.date} - {a.time}</TableCell>
+                              <TableCell>Dr. {a.doctorName}</TableCell>
+                              <TableCell><Badge variant={a.status === 'Atendido' ? 'default' : 'secondary'}>{a.status}</Badge></TableCell>
+                              <TableCell className="font-bold">S/. {a.cost.toFixed(2)}</TableCell>
+                              <TableCell className="text-xs italic">{a.observations || '-'}</TableCell>
+                              <TableCell>
+                                {a.status === 'Atendido' && !hasPaidForAppointment && (
+                                  <Button size="sm" variant="outline" onClick={() => openPaymentModal(a)}>
+                                    Registrar Pago
+                                  </Button>
+                                )}
+                                {hasPaidForAppointment && (
+                                  <Badge variant="default" className="bg-emerald-500">Pagado</Badge>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
                </Card>
             </TabsContent>
           </Tabs>
@@ -417,6 +732,20 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
               )}
            </DialogContent>
         </Dialog>
+
+        <PaymentModal
+          open={showPaymentModal}
+          onOpenChange={setShowPaymentModal}
+          selectedAppointment={selectedAppointment ? {
+            date: new Date(selectedAppointment.date).toLocaleDateString(),
+            doctorName: selectedAppointment.doctorId || 'N/A',
+            cost: selectedAppointment.cost || 0
+          } : undefined}
+          paymentForm={paymentForm}
+          onFormChange={setPaymentForm}
+          onSubmit={submitPayment}
+          isSubmitting={isSubmittingPayment}
+        />
       </AppLayout>
     </AuthProvider>
   );

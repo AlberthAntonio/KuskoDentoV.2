@@ -44,9 +44,24 @@ type ApiPayment = {
     date: string;
     time: string;
     status: string;
+    cost?: string | number;
     treatment?: { id: string; name: string } | null;
   };
   payment_histories?: ApiPaymentHistory[];
+};
+
+type ApiAppointment = {
+  id: string;
+  date: string;
+  time: string;
+  status: string;
+  cost: string | number;
+  patient?: {
+    id: string;
+    full_name: string;
+    dni: string;
+  };
+  treatment?: { id: string; name: string } | null;
 };
 
 type ApiResponse<T> = {
@@ -111,15 +126,72 @@ function PaymentsContent() {
 
   const load = async () => {
     try {
-      const data = await apiRequest<{ items: ApiPayment[] }>('/api/payments');
-      const items = Array.isArray(data.items) ? data.items : [];
-      setPayments(items);
+      const [paymentsData, completedAppointmentsData, attendedAppointmentsData] = await Promise.all([
+        apiRequest<ApiPayment[] | { items: ApiPayment[] }>('/api/payments'),
+        apiRequest<ApiAppointment[] | { items: ApiAppointment[] }>('/api/appointments?status=completed'),
+        apiRequest<ApiAppointment[] | { items: ApiAppointment[] }>('/api/appointments?status=attended'),
+      ]);
+
+      let items: ApiPayment[] = [];
+      if (Array.isArray(paymentsData)) {
+        items = paymentsData;
+      } else if (paymentsData && typeof paymentsData === 'object' && 'items' in paymentsData) {
+        items = Array.isArray((paymentsData as { items: ApiPayment[] }).items)
+          ? (paymentsData as { items: ApiPayment[] }).items
+          : [];
+      }
+
+      const extractAppointments = (raw: ApiAppointment[] | { items: ApiAppointment[] }): ApiAppointment[] => {
+        if (Array.isArray(raw)) return raw;
+        if (raw && typeof raw === 'object' && 'items' in raw) {
+          return Array.isArray((raw as { items: ApiAppointment[] }).items)
+            ? (raw as { items: ApiAppointment[] }).items
+            : [];
+        }
+        return [];
+      };
+
+      const allCompleted = [...extractAppointments(completedAppointmentsData), ...extractAppointments(attendedAppointmentsData)];
+      const seenAppointments = new Set<string>();
+      const uniqueCompleted = allCompleted.filter((a) => {
+        if (seenAppointments.has(a.id)) return false;
+        seenAppointments.add(a.id);
+        return true;
+      });
+
+      const paidAppointmentIds = new Set(items.map((p) => p.appointment?.id).filter(Boolean) as string[]);
+      const pendingRows: ApiPayment[] = uniqueCompleted
+        .filter((appt) => !paidAppointmentIds.has(appt.id))
+        .map((appt) => {
+          const totalCost = toNumber(appt.cost);
+          return {
+            id: `pending:${appt.id}`,
+            total_cost: totalCost,
+            total_paid: 0,
+            balance: totalCost,
+            payment_status: 'pending',
+            created_at: appt.date,
+            patient: appt.patient,
+            appointment: {
+              id: appt.id,
+              date: appt.date,
+              time: appt.time,
+              status: appt.status,
+              cost: appt.cost,
+              treatment: appt.treatment,
+            },
+            payment_histories: [],
+          };
+        });
+
+      setPayments([...items, ...pendingRows]);
     } catch (error) {
       toast({
         variant: 'destructive',
         title: 'No se pudo cargar pagos',
         description: error instanceof Error ? error.message : 'Error inesperado',
       });
+      setPayments([]);
     }
   };
 
@@ -139,18 +211,38 @@ function PaymentsContent() {
 
     try {
       setIsSubmitting(true);
-      await apiRequest(`/api/payments/${editingPayment.id}/history`, {
-        method: 'POST',
-        body: JSON.stringify({
-          amount_paid: newAmount,
-          payment_method: 'cash',
-          reference: 'abono-manual-ui',
-        }),
-      });
+      if (editingPayment.id.startsWith('pending:')) {
+        const appointmentId = editingPayment.appointment?.id;
+        const patientId = editingPayment.patient?.id;
+        if (!appointmentId || !patientId) {
+          throw new Error('No se pudo identificar la cita o el paciente para crear el pago.');
+        }
+
+        await apiRequest('/api/payments', {
+          method: 'POST',
+          body: JSON.stringify({
+            patient_id: patientId,
+            appointment_id: appointmentId,
+            amount: newAmount,
+            payment_method: 'cash',
+            notes: 'Pago inicial registrado desde seguimiento de pagos',
+            total_cost: toNumber(editingPayment.total_cost),
+          }),
+        });
+      } else {
+        await apiRequest(`/api/payments/${editingPayment.id}/history`, {
+          method: 'POST',
+          body: JSON.stringify({
+            amount_paid: newAmount,
+            payment_method: 'cash',
+            reference: 'abono-manual-ui',
+          }),
+        });
+      }
 
       setIsEditOpen(false);
       setNewAmount(0);
-      toast({ title: 'Abono registrado correctamente' });
+      toast({ title: editingPayment.id.startsWith('pending:') ? 'Pago creado correctamente' : 'Abono registrado correctamente' });
       await load();
     } catch (error) {
       toast({
@@ -311,6 +403,15 @@ function PaymentsContent() {
                     </TableRow>
                   );
                 })}
+                {paginatedData.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                      {payments.length === 0
+                        ? 'No hay pagos ni citas atendidas pendientes por cobrar'
+                        : 'No hay resultados que coincidan con tu búsqueda'}
+                    </TableCell>
+                  </TableRow>
+                )}
               </TableBody>
             </Table>
           </div>
