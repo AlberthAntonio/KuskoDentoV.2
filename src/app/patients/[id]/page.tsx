@@ -361,9 +361,8 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
     URL.revokeObjectURL(url);
   };
 
-  const openPreview = (fileBlob: Blob, fileType: string) => {
-    const url = URL.createObjectURL(fileBlob);
-    setPreviewData({ url, type: fileType });
+  const openPreview = (fileUrl: string, fileType: string) => {
+    setPreviewData({ url: fileUrl, type: fileType });
   };
 
   const deleteFile = async (store: 'radiographs' | 'consents', fileId: string) => {
