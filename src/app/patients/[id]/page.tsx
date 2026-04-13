@@ -3,7 +3,7 @@
 import { useState, useEffect, use } from 'react';
 import { AuthProvider } from '@/hooks/use-auth';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { db, Patient, Radiograph, Consent, Appointment, Payment, Odontogram } from '@/lib/legacy-data';
+import { Patient, Appointment, Payment, Odontogram } from '@/lib/legacy-data';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,6 +17,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PaymentModal } from '../../../components/PaymentModal';
+import { subirArchivoExterno } from '@/lib/external-upload';
 
 type ApiEnvelope<T> = {
   success?: boolean;
@@ -138,13 +139,81 @@ type OdontogramApi = {
   created_at: string;
 };
 
+type RadiographApi = {
+  id: string;
+  patient_id: string;
+  appointment_id?: string | null;
+  file_url: string;
+  file_name: string;
+  mime_type?: string | null;
+  type?: string | null;
+  created_at: string;
+};
+
+type ConsentApi = {
+  id: string;
+  patient_id: string;
+  consent_type: string;
+  document_url?: string | null;
+  created_at: string;
+};
+
+type RadiographItem = {
+  id: string;
+  patientId: string;
+  appointmentId?: string;
+  fileUrl: string;
+  type?: string;
+  date: string;
+  fileType: string;
+  fileName: string;
+};
+
+type ConsentItem = {
+  id: string;
+  patientId: string;
+  type: string;
+  date: string;
+  fileUrl: string;
+  fileType: string;
+  fileName: string;
+};
+
+const mimeTypeByExtension: Record<string, string> = {
+  pdf: 'application/pdf',
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  webp: 'image/webp',
+  gif: 'image/gif',
+  svg: 'image/svg+xml',
+};
+
+const inferMimeTypeFromFileName = (name: string): string => {
+  const cleanName = name.split('?')[0].split('#')[0];
+  const extension = cleanName.includes('.') ? cleanName.split('.').pop()?.toLowerCase() : undefined;
+  return extension ? mimeTypeByExtension[extension] || 'application/octet-stream' : 'application/octet-stream';
+};
+
+const getFileNameFromUrl = (url: string, fallback: string): string => {
+  try {
+    const parsed = new URL(url);
+    const lastSegment = parsed.pathname.split('/').filter(Boolean).pop();
+    return decodeURIComponent(lastSegment || fallback);
+  } catch {
+    const cleanUrl = url.split('?')[0];
+    const lastSegment = cleanUrl.split('/').filter(Boolean).pop();
+    return decodeURIComponent(lastSegment || fallback);
+  }
+};
+
 export default function PatientDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { toast } = useToast();
   const [patient, setPatient] = useState<Patient | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
-  const [radiographs, setRadiographs] = useState<Radiograph[]>([]);
-  const [consents, setConsents] = useState<Consent[]>([]);
+  const [radiographs, setRadiographs] = useState<RadiographItem[]>([]);
+  const [consents, setConsents] = useState<ConsentItem[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [odontograms, setOdontograms] = useState<Odontogram[]>([]);
   
@@ -160,11 +229,13 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
 
   const loadAll = async () => {
     try {
-      const [patientApi, paymentsApi, appointmentsApi, odontogramsApi] = await Promise.all([
+      const [patientApi, paymentsApi, appointmentsApi, odontogramsApi, radiographsApi, consentsApi] = await Promise.all([
         fetchApi<PatientApi>(`/api/patients/${id}`),
         fetchApi<{ items: PaymentApi[] }>(`/api/payments?patient_id=${id}`),
         fetchApi<{ items: AppointmentApi[] }>(`/api/appointments?patient_id=${id}`),
         fetchApi<{ items: OdontogramApi[] }>(`/api/odontograms?patient_id=${id}`),
+        fetchApi<{ items: RadiographApi[] }>(`/api/radiographs?patient_id=${id}`),
+        fetchApi<{ items: ConsentApi[] }>(`/api/consents?patient_id=${id}`),
       ]);
 
       const nameParts = splitFullName(patientApi.full_name);
@@ -258,11 +329,42 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
           }))
       );
 
-      // No existen endpoints REST para estos modulos en la version actual.
-      // Cargar radiografías filtrando por paciente
-      const radiographsApi = await db.getAll<Radiograph>('radiographs', id);
-      setRadiographs(radiographsApi);
-      setConsents([]);
+      setRadiographs(
+        (radiographsApi.items || [])
+          .sort((a, b) => parseDateValue(b.created_at) - parseDateValue(a.created_at))
+          .map((item): RadiographItem => ({
+            id: item.id,
+            patientId: item.patient_id,
+            appointmentId: item.appointment_id || undefined,
+            fileUrl: item.file_url,
+            type: item.type || undefined,
+            date: toDisplayDate(item.created_at),
+            fileType: item.mime_type || inferMimeTypeFromFileName(item.file_name),
+            fileName: item.file_name,
+          }))
+      );
+
+      setConsents(
+        (consentsApi.items || [])
+          .filter((item) => Boolean(item.document_url))
+          .sort((a, b) => parseDateValue(b.created_at) - parseDateValue(a.created_at))
+          .map((item, index): ConsentItem => {
+            const fileUrl = String(item.document_url);
+            const fallbackName = `consentimiento-${index + 1}`;
+            const fileName = getFileNameFromUrl(fileUrl, fallbackName);
+
+            return {
+              id: item.id,
+              patientId: item.patient_id,
+              type: item.consent_type,
+              date: toDisplayDate(item.created_at),
+              fileUrl,
+              fileType: inferMimeTypeFromFileName(fileName),
+              fileName,
+            };
+          })
+      );
+
       setOdontograms(
         (odontogramsApi.items || [])
           .sort((a, b) => parseDateValue(b.created_at) - parseDateValue(a.created_at))
@@ -286,19 +388,13 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
     }
   };
 
-  // Nuevo flujo: subir imagen a /api/upload y luego guardar en /api/radiographs
   const uploadImage = async (file: File) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    const response = await fetch('/api/upload', {
-      method: 'POST',
-      body: formData,
-      credentials: 'include',
-    });
-    if (!response.ok) {
+    const url = await subirArchivoExterno(file);
+    if (!url) {
       throw new Error('No se pudo subir la imagen');
     }
-    return await response.json(); // { url, name, size, type }
+
+    return { url };
   };
 
   const saveRadiograph = async (data: {
@@ -324,6 +420,26 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
     return await response.json();
   };
 
+  const saveConsent = async (data: {
+    patient_id: string;
+    appointment_id?: string;
+    consent_type: string;
+    document_url: string;
+    notes?: string;
+  }) => {
+    const response = await fetch('/api/consents', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => null);
+      throw new Error(error?.error || 'No se pudo guardar el consentimiento');
+    }
+    return await response.json();
+  };
+
   const handleFileUpload = async (type: 'radiograph' | 'consent', e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -335,9 +451,15 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
         await saveRadiograph({
           patient_id: id,
           file_url: uploadResult.url,
-          file_name: uploadResult.name,
-          file_size: uploadResult.size,
-          mime_type: uploadResult.type,
+          file_name: file.name,
+          file_size: file.size,
+          mime_type: file.type,
+        });
+      } else {
+        await saveConsent({
+          patient_id: id,
+          consent_type: file.type.includes('pdf') ? 'consentimiento_pdf' : 'consentimiento_imagen',
+          document_url: uploadResult.url,
         });
       }
       toast({ title: "Archivo subido", description: "El documento se guardó correctamente." });
@@ -352,13 +474,15 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
     e.target.value = '';
   };
 
-  const downloadFile = (fileBlob: Blob, fileName: string) => {
-    const url = URL.createObjectURL(fileBlob);
+  const downloadFile = (fileSource: Blob | string, fileName: string) => {
+    const url = typeof fileSource === 'string' ? fileSource : URL.createObjectURL(fileSource);
     const a = document.createElement('a');
     a.href = url;
     a.download = fileName;
     a.click();
-    URL.revokeObjectURL(url);
+    if (typeof fileSource !== 'string') {
+      URL.revokeObjectURL(url);
+    }
   };
 
   const closePreview = () => {
@@ -391,12 +515,22 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
   const deleteFile = async (store: 'radiographs' | 'consents', fileId: string) => {
     if (confirm("¿Eliminar este archivo permanentemente?")) {
       try {
-        await db.delete(store, fileId);
+        const endpoint = store === 'radiographs' ? `/api/radiographs/${fileId}` : `/api/consents/${fileId}`;
+        const response = await fetch(endpoint, {
+          method: 'DELETE',
+          credentials: 'include',
+        });
+
+        if (!response.ok) {
+          const error = await response.json().catch(() => null);
+          throw new Error(error?.error || 'No se pudo eliminar el archivo');
+        }
+
         loadAll();
       } catch (error) {
         toast({
-          title: 'Modulo en migracion',
-          description: error instanceof Error ? error.message : 'Aun no se pudo eliminar este archivo.',
+          title: 'Error al eliminar archivo',
+          description: error instanceof Error ? error.message : 'No se pudo eliminar este archivo.',
           variant: 'destructive',
         });
       }
@@ -581,7 +715,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
                           <p className="text-[9px] text-muted-foreground">{r.date}</p>
                        </div>
                        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
-                         <Button variant="secondary" size="icon" className="h-7 w-7" onClick={() => downloadFile(r.fileBlob, r.fileName)}><Download className="w-3 h-3" /></Button>
+                         <Button variant="secondary" size="icon" className="h-7 w-7" onClick={() => downloadFile(r.fileUrl, r.fileName)}><Download className="w-3 h-3" /></Button>
                          <Button variant="destructive" size="icon" className="h-7 w-7" onClick={() => deleteFile('radiographs', r.id)}><Trash2 className="w-3 h-3" /></Button>
                        </div>
                      </Card>
@@ -622,7 +756,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
                           </div>
                        </div>
                        <div className="flex gap-2">
-                          <Button variant="ghost" size="sm" onClick={() => openPreview(c.fileBlob, c.fileType)}>Previsualizar</Button>
+                          <Button variant="ghost" size="sm" onClick={() => openPreview(c.fileUrl, c.fileType)}>Previsualizar</Button>
                           <Button variant="ghost" size="icon" className="text-destructive opacity-0 group-hover:opacity-100" onClick={() => deleteFile('consents', c.id)}><Trash2 className="w-4 h-4" /></Button>
                        </div>
                      </Card>

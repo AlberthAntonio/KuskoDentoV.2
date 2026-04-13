@@ -19,6 +19,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { addMonths, format, parseISO, isValid } from 'date-fns';
+import { subirArchivoExterno } from '@/lib/external-upload';
 
 type SaveUserPayload = {
   id?: string;
@@ -140,22 +141,15 @@ function UsersContent() {
       reader.readAsDataURL(file);
 
       try {
-        const formData = new FormData();
-        formData.append('file', file);
-        const res = await fetch('/api/uploads', { method: 'POST', body: formData });
-        if (!res.ok) {
-          const body = await res.json().catch(() => null);
-          toast({ variant: 'destructive', title: 'Error al subir', description: body?.error || 'Error de servidor' });
+        const url = await subirArchivoExterno(file);
+        if (!url) {
+          toast({ variant: 'destructive', title: 'Error al subir', description: 'Respuesta inválida del servidor' });
           return;
         }
-        const data = await res.json();
-        if (data?.url) {
-          setUploadedPhotoUrl(data.url);
-          setPhotoPreview(data.url);
-        } else {
-          toast({ variant: 'destructive', title: 'Error al subir', description: 'Respuesta inválida del servidor' });
-        }
-      } catch (err) {
+
+        setUploadedPhotoUrl(url);
+        setPhotoPreview(url);
+      } catch {
         toast({ variant: 'destructive', title: 'Error al subir', description: 'No se pudo conectar' });
       }
     }
