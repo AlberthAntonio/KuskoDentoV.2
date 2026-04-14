@@ -68,13 +68,15 @@ function getReminderIntervalLabel(graceDay: number): string {
   return '5 minutos';
 }
 
-export function AppLayout({ children }: { children: React.ReactNode }) {
+export function AppLayout({ children, isPayModalOpen: isPayModalOpenProp, setIsPayModalOpen: setIsPayModalOpenProp }: { children: React.ReactNode, isPayModalOpen?: boolean, setIsPayModalOpen?: (isOpen: boolean) => void }) {
   const { user, logout, updateUser } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
   
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
-  const [isPayModalOpen, setIsPayModalOpen] = useState(false);
+  const [isPayModalOpenInternal, setIsPayModalOpenInternal] = useState(false);
+  const isPayModalOpen = isPayModalOpenProp ?? isPayModalOpenInternal;
+  const setIsPayModalOpen = setIsPayModalOpenProp ?? setIsPayModalOpenInternal;
   const [isMoraReminderOpen, setIsMoraReminderOpen] = useState(false);
   const [moraCountdown, setMoraCountdown] = useState(5);
   const overdueDays = user?.nextPaymentDate
@@ -280,57 +282,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               ))}
             </SidebarMenu>
           </SidebarContent>
-          <div className="mt-auto p-8 border-t bg-slate-50/50 dark:bg-slate-900/20">
-            {!isAdmin && (
-              <div className="mb-6 space-y-4">
-                <div className="p-5 bg-white dark:bg-slate-900 rounded-[1.5rem] border shadow-sm space-y-3">
-                  <div className="flex justify-between items-center">
-                    <p className="text-[10px] uppercase font-black text-muted-foreground tracking-widest leading-none">Status Acceso</p>
-                    <Badge 
-                      variant={currentStatus === 'active' ? 'default' : 'destructive'} 
-                      className={cn(
-                        "text-[9px] h-5 font-black px-2 uppercase tracking-tighter",
-                        isOverdue && "bg-amber-500 hover:bg-amber-600",
-                        currentStatus === 'active' && "bg-emerald-500 hover:bg-emerald-600"
-                      )}
-                    >
-                      {isBlocked ? 'BLOQUEADO' : isSuspended ? 'SUSPENDIDO' : isOverdue ? 'EN MORA' : 'ACTIVO'}
-                    </Badge>
-                  </div>
-                  <div className="space-y-2">
-                    <p className="flex justify-between text-[11px] font-bold">
-                      <span className="text-muted-foreground">ABONO:</span>
-                      <span className="text-primary">S/. {subscriptionFee.toFixed(2)}</span>
-                    </p>
-                    {user.nextPaymentDate && (
-                      <p className="flex justify-between text-[11px] font-bold">
-                        <span className="text-muted-foreground">LÍMITE:</span>
-                        <span className={cn(isOverdue ? "text-amber-600" : "text-slate-600 dark:text-slate-400")}>
-                          {format(parseISO(user.nextPaymentDate), 'dd/MM/yyyy')}
-                        </span>
-                      </p>
-                    )}
-                  </div>
-                </div>
-                <Button 
-                  variant="default" 
-                  size="sm" 
-                  className="w-full h-12 text-[10px] font-black gap-3 shadow-xl shadow-primary/20 rounded-2xl uppercase tracking-widest transition-transform active:scale-95" 
-                  onClick={() => setIsPayModalOpen(true)}
-                >
-                  <Wallet className="w-4 h-4" />
-                  Pagar / Renovar
-                </Button>
-              </div>
-            )}
-            <button 
-              onClick={logout}
-              className="flex items-center gap-4 text-destructive hover:bg-destructive/10 w-full p-4 rounded-2xl transition-colors font-black text-xs uppercase tracking-widest"
-            >
-              <LogOut className="w-5 h-5" />
-              <span>Cerrar Sesión</span>
-            </button>
-          </div>
+        
         </Sidebar>
         <SidebarInset className="bg-transparent">
           <header className="flex h-20 shrink-0 items-center gap-4 border-b bg-white dark:bg-slate-950 px-8">
