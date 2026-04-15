@@ -222,7 +222,7 @@ export function AppLayout({ children, isPayModalOpen: isPayModalOpenProp, setIsP
     { icon: Activity, label: 'Odontograma', href: '/odontogram', show: !isAdmin && !isSuspended },
     { icon: Calendar, label: 'Citas', href: '/appointments', show: !isAdmin && !isSuspended },
     { icon: Boxes, label: 'Inventario', href: '/inventory', show: !isAdmin && !isSuspended },
-    { icon: Database, label: 'Copia de Seguridad', href: '/backups', show: (isAdmin || isClinic) && !isSuspended },
+   // { icon: Database, label: 'Copia de Seguridad', href: '/backups', show: (isAdmin || isClinic) && !isSuspended },
     { icon: UserIcon, label: 'Mi Perfil', href: '/profile', show: true },
   ];
 
