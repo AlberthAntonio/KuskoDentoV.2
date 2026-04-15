@@ -37,28 +37,7 @@ export async function POST(request: Request) {
       return apiError('Datos de cita invalidos', 400);
     }
 
-    // Normalizar fecha recibida (YYYY-MM-DD) a un instante seguro (mediodía UTC)
-    // para evitar desfaces por zonas horarias al guardar y mostrar la fecha.
-    const payload = parsed.data as unknown as { date: string } & Record<string, any>;
-    const parts = payload.date.split('-').map((s: string) => parseInt(s, 10));
-    if (parts.length !== 3 || parts.some(isNaN)) {
-      return apiError('Formato de fecha invalido', 400);
-    }
-    const [y, m, d] = parts;
-    const normalizedDate = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
-
-    const createData = {
-      patient_id: payload.patient_id,
-      doctor_id: payload.doctor_id,
-      treatment_id: payload.treatment_id,
-      date: normalizedDate,
-      time: payload.time,
-      cost: payload.cost,
-      status: payload.status,
-      observations: typeof payload.observations === 'string' ? payload.observations : undefined,
-    };
-
-    const created = await appointmentService.create(clinicId, createData as any);
+    const created = await appointmentService.create(clinicId, parsed.data);
     return apiOk(created, 201);
   } catch (error) {
     return apiErrorFromUnknown(error, 500, 'api/appointments#post');

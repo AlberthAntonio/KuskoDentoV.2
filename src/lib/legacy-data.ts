@@ -261,12 +261,10 @@ export interface PaymentMethod {
   label?: string;
   value?: string;
   qrImage?: string;
-  holder?: string;
-  cci?: string;
 }
 
 export const db = {
-  async getAll<T = unknown>(table: string, patientId?: string): Promise<T[]> {
+  async getAll<T = unknown>(table: string): Promise<T[]> {
     try {
       if (table === 'payments') {
         const data = await apiGet<{ items?: Array<{
@@ -453,23 +451,10 @@ export const db = {
       }
 
       if (table === 'payment_methods') {
-        try {
-          const server = await apiGet<any[]>('/api/payment-methods');
-          const serverList = Array.isArray(server) ? server : [];
-          const local = readPaymentMethodsStorage();
-          const map = new Map<string, any>();
-          serverList.forEach((s) => map.set(String(s.id), s));
-          (local || []).forEach((l) => {
-            if (!map.has(String(l.id))) map.set(String(l.id), l);
-          });
-          return Array.from(map.values()) as T[];
-        } catch {
-          return readPaymentMethodsStorage() as T[];
-        }
+        return readPaymentMethodsStorage() as T[];
       }
 
       if (table === 'radiographs') {
-        const url = patientId ? `/api/radiographs?patient_id=${patientId}` : '/api/radiographs';
         const data = await apiGet<{ items?: Array<{
           id: string;
           patient_id: string;
@@ -480,7 +465,7 @@ export const db = {
           type?: string | null;
           created_at: string;
           clinic_id: string;
-        }> }>(url);
+        }> }>('/api/radiographs');
 
         const items = (data.items || []).map((item) => ({
           id: item.id,
@@ -490,6 +475,7 @@ export const db = {
           type: item.type || undefined,
           clinicId: item.clinic_id,
           date: toDate(item.created_at),
+          fileBlob: dataUrlToBlob(item.file_url, item.mime_type || 'image/*'),
           fileType: item.mime_type || 'image/*',
           fileName: item.file_name,
         }));
@@ -587,9 +573,7 @@ export const db = {
       data: {},
     });
   },
-  async importData(data: unknown): Promise<void> {
-    void data;
-  },
+  async importData(_data: unknown): Promise<void> {},
   put: async (tableOrData: string | unknown, maybeData?: unknown): Promise<null> => {
     const table = typeof tableOrData === 'string' ? tableOrData : undefined;
     const payload = (typeof tableOrData === 'string' ? maybeData : tableOrData) as Record<string, unknown> | undefined;
@@ -666,41 +650,17 @@ export const db = {
     }
 
     if (table === 'payment_methods' && payload) {
-      const id = String(payload.id || crypto.randomUUID());
-      const method = {
-        id,
-        type: (payload.type as PaymentMethod['type']) || 'bank',
-        label: String(payload.label || ''),
-        value: String(payload.value || ''),
-        qrImage: payload.qrImage ? String(payload.qrImage) : undefined,
-        holder: typeof payload.holder === 'string' ? payload.holder : undefined,
-        cci: typeof payload.cci === 'string' ? payload.cci : undefined,
-      };
-
-      // Try persist to server; fallback to localStorage
-      try {
-        const resp = await fetch('/api/payment-methods', {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(method),
-        });
-
-        if (resp.ok) {
-          const body = await resp.json().catch(() => null);
-          if (Array.isArray(body)) {
-            writePaymentMethodsStorage(body as PaymentMethod[]);
-            return null;
-          }
-        }
-      } catch (e) {
-        // ignore and fallback to local
-      }
-
       const current = readPaymentMethodsStorage();
+      const id = String(payload.id || crypto.randomUUID());
       const next = [
         ...current.filter((item) => item.id !== id),
-        method,
+        {
+          id,
+          type: (payload.type as PaymentMethod['type']) || 'bank',
+          label: String(payload.label || ''),
+          value: String(payload.value || ''),
+          qrImage: payload.qrImage ? String(payload.qrImage) : undefined,
+        },
       ];
       writePaymentMethodsStorage(next);
       return null;
@@ -796,26 +756,6 @@ export const db = {
     }
 
     if (table === 'payment_methods') {
-      // Try server delete first, fallback to localStorage
-      try {
-        const resp = await fetch('/api/payment-methods', {
-          method: 'DELETE',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id }),
-        });
-
-        if (resp.ok) {
-          const body = await resp.json().catch(() => null);
-          if (Array.isArray(body)) {
-            writePaymentMethodsStorage(body as PaymentMethod[]);
-            return null;
-          }
-        }
-      } catch (e) {
-        // fallback
-      }
-
       const current = readPaymentMethodsStorage();
       writePaymentMethodsStorage(current.filter((item) => item.id !== id));
       return null;

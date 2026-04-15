@@ -30,17 +30,6 @@ export const LoginSchema = z.object({
   path: ['identifier'],
 });
 
-export const ChangePasswordSchema = z
-  .object({
-    current_password: z.string().min(8),
-    new_password: z.string().min(8),
-    confirm_password: z.string().min(8).optional(),
-  })
-  .refine((data) => (data.confirm_password ? data.new_password === data.confirm_password : true), {
-    message: 'Las contraseñas no coinciden',
-    path: ['confirm_password'],
-  });
-
 export const CreatePatientSchema = z.object({
   dni: z.string().min(5),
   full_name: z.string().min(2),
@@ -54,11 +43,6 @@ export const CreatePatientSchema = z.object({
   postal_code: z.string().optional(),
   gender: z.string().optional(),
   medical_observations: z.string().optional(),
-  under_treatment: z.boolean().optional(),
-  prone_to_bleeding: z.boolean().optional(),
-  allergic_to_meds: z.boolean().optional(),
-  allergies_detail: z.string().optional(),
-  registered_by: optionalCuid,
 });
 
 export const UpdatePatientSchema = CreatePatientSchema.partial();
@@ -67,12 +51,10 @@ export const CreateAppointmentSchema = z.object({
   patient_id: z.string().cuid(),
   doctor_id: z.string().cuid(),
   treatment_id: z.string().cuid().optional(),
-  // Fecha en formato ISO local-date (YYYY-MM-DD). Se normaliza en el servidor.
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato de fecha debe ser YYYY-MM-DD'),
+  date: z.coerce.date(),
   time: z.string().min(4),
   cost: z.number().positive(),
   status: z.string().optional(),
-  observations: z.string().optional(),
 });
 
 export const CreatePaymentSchema = z.object({

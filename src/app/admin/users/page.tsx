@@ -19,7 +19,6 @@ import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { addMonths, format, parseISO, isValid } from 'date-fns';
-import { subirArchivoExterno } from '@/lib/external-upload';
 
 type SaveUserPayload = {
   id?: string;
@@ -62,7 +61,6 @@ function UsersContent() {
   const [isOpen, setIsOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-  const [uploadedPhotoUrl, setUploadedPhotoUrl] = useState<string | null>(null);
   const [isValidatingDni, setIsValidatingDni] = useState(false);
   const [isBillingScheduleDirty, setIsBillingScheduleDirty] = useState(false);
   const todayDate = new Date().toISOString().split('T')[0];
@@ -127,31 +125,16 @@ function UsersContent() {
     }, 1500);
   };
 
-  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 2 * 1024 * 1024) {
         toast({ variant: "destructive", title: "Archivo demasiado grande", description: "El límite es 2MB." });
         return;
       }
-
-      // Mostrar vista previa inmediata (data URL) mientras sube
       const reader = new FileReader();
       reader.onloadend = () => setPhotoPreview(reader.result as string);
       reader.readAsDataURL(file);
-
-      try {
-        const url = await subirArchivoExterno(file);
-        if (!url) {
-          toast({ variant: 'destructive', title: 'Error al subir', description: 'Respuesta inválida del servidor' });
-          return;
-        }
-
-        setUploadedPhotoUrl(url);
-        setPhotoPreview(url);
-      } catch {
-        toast({ variant: 'destructive', title: 'Error al subir', description: 'No se pudo conectar' });
-      }
     }
   };
 
@@ -168,7 +151,7 @@ function UsersContent() {
       dni: form.dni,
       address: form.address,
       colegiatura: form.colegiatura,
-      photo: uploadedPhotoUrl || undefined,
+      photo: photoPreview || undefined,
       role: isAdmin ? 'clinic' : form.role,
       subscriptionFee: isAdmin ? (parseFloat(form.subscriptionFee) || 0) : undefined,
       subscriptionStatus: form.subscriptionStatus,
@@ -230,7 +213,6 @@ function UsersContent() {
   const resetForm = () => {
     setEditingId(null);
     setPhotoPreview(null);
-    setUploadedPhotoUrl(null);
     setIsBillingScheduleDirty(false);
     setForm({ 
       username: '', 
@@ -285,7 +267,6 @@ function UsersContent() {
       subscriptionStatus: u.subscriptionStatus
     });
     setPhotoPreview(u.photo || null);
-    setUploadedPhotoUrl(u.photo || null);
     setIsOpen(true);
   };
 

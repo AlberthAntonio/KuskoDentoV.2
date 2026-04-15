@@ -1,9 +1,0 @@
-[
-  {
-    "id": "1",
-    "bank": "Nombre del Banco",
-    "number": "000-000000",
-    "cci": "000-000-000000000-00",
-    "holder": "Nombre del Titular"
-  }
-]

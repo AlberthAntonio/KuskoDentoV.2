@@ -289,16 +289,3 @@ model InventoryItem {
   @@index([clinic_id])
   @@index([quantity])
 }
-
-model PaymentMethod {
-  id           String   @id @default(cuid())
-  bank         String
-  accountNumber String
-  cci          String?  
-  holderName   String?
-  qrImage      String?  @db.LongText
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  @@index([bank])
-}

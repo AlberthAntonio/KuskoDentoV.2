@@ -113,7 +113,15 @@ function AppointmentsContent() {
   const [filterType, setFilterType] = useState<'all' | 'today' | 'week' | 'specific'>('all');
   const [specificDate, setSpecificDate] = useState('');
 
-  const [staffList, setStaffList] = useState<Array<{ id: string; label: string }>>([]);
+  const doctorOptions = useMemo(
+    () => [
+      {
+        id: currentUser?.id || '',
+        label: currentUser?.fullName || currentUser?.full_name || currentUser?.email || 'Odontologo',
+      },
+    ],
+    [currentUser?.id, currentUser?.fullName, currentUser?.full_name, currentUser?.email]
+  );
 
   const [form, setForm] = useState({
     patientId: '',
@@ -130,7 +138,6 @@ function AppointmentsContent() {
   useEffect(() => {
     if (currentUser) {
       load();
-      // inicialmente, dejaremos doctorId en blanco; se establecerá cuando carguemos staff
       setForm((prev) => ({ ...prev, doctorId: currentUser.id }));
     }
   }, [currentUser?.id]);
@@ -141,11 +148,10 @@ function AppointmentsContent() {
 
   const load = async () => {
     try {
-      const [patientsData, treatmentsData, appointmentsData, staffData] = await Promise.all([
+      const [patientsData, treatmentsData, appointmentsData] = await Promise.all([
         apiRequest<{ items: ApiPatient[]; total: number; page: number; limit: number; totalPages: number }>('/api/patients?limit=200&view=lookup'),
         apiRequest<{ items: ApiTreatment[] }>('/api/treatments'),
         apiRequest<{ items: ApiAppointment[] }>('/api/appointments?view=calendar'),
-        apiRequest<{ items: Array<{ id: string; fullName?: string; username?: string; role?: string }> }>('/api/admin/users'),
       ]);
 
       setPatients(patientsData.items || []);
@@ -167,16 +173,6 @@ function AppointmentsContent() {
       }));
 
       setRawAppointments(mapped);
-
-      // Mapear staff para el select de medicos
-      const staffItems = (staffData.items || [])
-        .filter((u) => u && u.id)
-        .map((u) => ({ id: u.id, label: u.fullName || u.username || 'Medico' }));
-
-      setStaffList(staffItems);
-
-      // Si el formulario no tiene doctor asignado, establecer el primero disponible
-      setForm((prev) => ({ ...prev, doctorId: prev.doctorId || staffItems[0]?.id || prev.doctorId }));
     } catch (error) {
       toast({
         variant: 'destructive',
@@ -296,26 +292,19 @@ function AppointmentsContent() {
   const confirmDelete = async () => {
     if (!appointmentToDelete) return;
 
-    if (!confirmWord || confirmWord.trim().length === 0) {
+    if (confirmWord.trim().toUpperCase() !== 'ELIMINAR') {
       toast({
         variant: 'destructive',
-        title: 'Contraseña requerida',
-        description: 'Ingrese su contraseña para confirmar la eliminación.',
+        title: 'Confirmacion invalida',
+        description: 'Escriba ELIMINAR para confirmar la eliminacion.',
       });
       return;
     }
 
     try {
-      // Verificar que la contraseña ingresada corresponde al usuario autenticado
-      await apiRequest('/api/auth/verify-password', {
-        method: 'POST',
-        body: JSON.stringify({ password: confirmWord }),
-      });
-
       await apiRequest(`/api/appointments/${appointmentToDelete}`, { method: 'DELETE' });
       setIsDeleteOpen(false);
       setAppointmentToDelete(null);
-      setConfirmWord('');
       toast({ title: 'Cita eliminada' });
       load();
     } catch (error) {
@@ -417,7 +406,7 @@ function AppointmentsContent() {
                         <SelectValue placeholder="Seleccione Doctor" />
                       </SelectTrigger>
                       <SelectContent>
-                        {(staffList.length > 0 ? staffList : [{ id: currentUser?.id || '', label: currentUser?.fullName || currentUser?.full_name || currentUser?.email || 'Odontologo' }]).map((u) => (
+                        {doctorOptions.map((u) => (
                           <SelectItem key={u.id} value={u.id}>
                             {u.label}
                           </SelectItem>
@@ -579,15 +568,15 @@ function AppointmentsContent() {
       <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-                <DialogTitle className="flex items-center gap-2 text-destructive">
-                  <ShieldAlert className="w-5 h-5" /> Confirmar Eliminacion
-                </DialogTitle>
-                <DialogDescription>Esta acción es irreversible. Ingrese la contraseña con la que inició sesión para confirmar.</DialogDescription>
-              </DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <ShieldAlert className="w-5 h-5" /> Confirmar Eliminacion
+            </DialogTitle>
+            <DialogDescription>Esta accion es irreversible. Escriba ELIMINAR para continuar.</DialogDescription>
+          </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="delete-confirm">Contraseña</Label>
-              <Input id="delete-confirm" type="password" value={confirmWord} onChange={(e) => setConfirmWord(e.target.value)} placeholder="Contraseña" />
+              <Label htmlFor="delete-confirm">Confirmacion</Label>
+              <Input id="delete-confirm" value={confirmWord} onChange={(e) => setConfirmWord(e.target.value)} placeholder="ELIMINAR" />
             </div>
           </div>
           <DialogFooter>

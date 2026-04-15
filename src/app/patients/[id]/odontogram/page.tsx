@@ -51,10 +51,10 @@ function InteractiveTooth({
 
   const getSurfaceColor = (name: string) => {
     const status = surfaces[name] || 'healthy';
-    if (status === 'healthy') return 'fill-slate-50 stroke-slate-500';
+    if (status === 'healthy') return 'fill-white stroke-slate-300';
     
     const tool = tools.find(t => t.id === status);
-    if (!tool) return 'fill-slate-50 stroke-slate-500';
+    if (!tool) return 'fill-white stroke-slate-300';
     
     if (tool.color.includes('red')) return 'fill-red-500 stroke-red-700';
     if (tool.color.includes('blue')) return 'fill-blue-500 stroke-blue-700';
@@ -78,15 +78,15 @@ function InteractiveTooth({
   };
 
   return (
-    <div className="flex flex-col items-center gap-1.5 group">
-      <span className="text-[11px] font-bold text-muted-foreground md:text-xs">{id}</span>
-      <div className="relative w-11 h-11 md:w-12 md:h-12 flex items-center justify-center">
-        <svg viewBox="0 0 100 100" className="w-9 h-9 md:w-10 md:h-10 overflow-visible">
-          <path d="M 10 10 L 90 10 L 70 30 L 30 30 Z" className={cn("stroke-[3px] transition-colors cursor-pointer hover:opacity-80", getSurfaceColor('top'))} onClick={() => handleClick('top')} />
-          <path d="M 30 70 L 70 70 L 90 90 L 10 90 Z" className={cn("stroke-[3px] transition-colors cursor-pointer hover:opacity-80", getSurfaceColor('bottom'))} onClick={() => handleClick('bottom')} />
-          <path d="M 10 10 L 30 30 L 30 70 L 10 90 Z" className={cn("stroke-[3px] transition-colors cursor-pointer hover:opacity-80", getSurfaceColor('left'))} onClick={() => handleClick('left')} />
-          <path d="M 90 10 L 90 90 L 70 70 L 70 30 Z" className={cn("stroke-[3px] transition-colors cursor-pointer hover:opacity-80", getSurfaceColor('right'))} onClick={() => handleClick('right')} />
-          <rect x="30" y="30" width="40" height="40" className={cn("stroke-[3px] transition-colors cursor-pointer hover:opacity-80", getSurfaceColor('center'))} onClick={() => handleClick('center')} />
+    <div className="flex flex-col items-center gap-1 group">
+      <span className="text-[9px] font-bold text-muted-foreground">{id}</span>
+      <div className="relative w-9 h-9 flex items-center justify-center">
+        <svg viewBox="0 0 100 100" className="w-7 h-7 overflow-visible">
+          <path d="M 10 10 L 90 10 L 70 30 L 30 30 Z" className={cn("transition-colors cursor-pointer hover:opacity-80", getSurfaceColor('top'))} onClick={() => handleClick('top')} />
+          <path d="M 30 70 L 70 70 L 90 90 L 10 90 Z" className={cn("transition-colors cursor-pointer hover:opacity-80", getSurfaceColor('bottom'))} onClick={() => handleClick('bottom')} />
+          <path d="M 10 10 L 30 30 L 30 70 L 10 90 Z" className={cn("transition-colors cursor-pointer hover:opacity-80", getSurfaceColor('left'))} onClick={() => handleClick('left')} />
+          <path d="M 90 10 L 90 90 L 70 70 L 70 30 Z" className={cn("transition-colors cursor-pointer hover:opacity-80", getSurfaceColor('right'))} onClick={() => handleClick('right')} />
+          <rect x="30" y="30" width="40" height="40" className={cn("transition-colors cursor-pointer hover:opacity-80", getSurfaceColor('center'))} onClick={() => handleClick('center')} />
           
           {globalState === 'missing' && <path d="M 0 0 L 100 100 M 100 0 L 0 100" className="stroke-red-600 stroke-[8px]" />}
           {globalState === 'crown' && <circle cx="50" cy="50" r="45" className="fill-none stroke-amber-500 stroke-[6px]" />}

@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -11,13 +10,14 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useMutation } from '@/hooks/use-mutation';
-import { Lock, ShieldCheck, User as UserIcon, QrCode, Building2, Plus, Trash2, Camera, Wallet, Palette, Sun, Moon, Laptop, Sparkles, Type, Eye, EyeOff, Edit } from 'lucide-react';
+import { Lock, ShieldCheck, User as UserIcon, QrCode, Building2, Plus, Trash2, Camera, Wallet, Palette, Sun, Moon, Laptop, Sparkles, Type, CreditCard, LogOut } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { format, parseISO, differenceInCalendarDays } from 'date-fns';
 
 type BrandingResponse = {
   clinic: {
@@ -46,12 +46,10 @@ function ProfileContent() {
   const { toast } = useToast();
   const [passwords, setPasswords] = useState({ current: '', new: '', confirm: '' });
   const [isChanging, setIsChanging] = useState(false);
-  const [showCurrent, setShowCurrent] = useState(false);
-  const [showNew, setShowNew] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
   const [isSavingAppearance, setIsSavingAppearance] = useState(false);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [isMethodOpen, setIsMethodOpen] = useState(false);
+  const [isPayModalOpen, setIsPayModalOpen] = useState(false);
   const { mutate: saveBranding } = useMutation<BrandingResponse, BrandingPayload>(
     '/api/clinics/me/branding',
     'PUT'
@@ -64,7 +62,7 @@ function ProfileContent() {
   const [brandName, setBrandName] = useState(user?.brandName || '');
   const [slogan, setSlogan] = useState(user?.slogan || '');
 
-  const [newMethod, setNewMethod] = useState<Partial<PaymentMethod>>({ type: 'bank', label: '', value: '', qrImage: '', holder: '', cci: '' });
+  const [newMethod, setNewMethod] = useState<Partial<PaymentMethod>>({ type: 'bank', label: '', value: '', qrImage: '' });
 
   useEffect(() => {
     if (user?.role === 'admin') loadMethods();
@@ -89,6 +87,24 @@ function ProfileContent() {
   const isAdmin = user.role === 'admin';
   const isClinic = ['clinic', 'clinic_owner', 'clinic_admin'].includes(user.role);
 
+  const overdueDays = user?.nextPaymentDate
+    ? Math.max(0, differenceInCalendarDays(new Date(), parseISO(user.nextPaymentDate)))
+    : 0;
+
+  const currentStatus = user ? (() => {
+    if (user.subscriptionStatus === 'blocked') return 'blocked';
+    if (user.subscriptionStatus === 'suspended') return 'suspended';
+    if (!user.nextPaymentDate) return 'active';
+    if (overdueDays > 7) return 'blocked';
+    if (overdueDays > 0) return 'overdue';
+    return 'active';
+  })() : 'active';
+
+  const isOverdue = currentStatus === 'overdue';
+  const isBlocked = currentStatus === 'blocked';
+  const isSuspended = currentStatus === 'suspended';
+  const subscriptionFee = typeof user?.subscriptionFee === 'number' ? user.subscriptionFee : 50;
+
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (passwords.new !== passwords.confirm) {
@@ -97,22 +113,8 @@ function ProfileContent() {
     }
     setIsChanging(true);
     try {
-      const resp = await fetch('/api/auth/change-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ current_password: passwords.current, new_password: passwords.new, confirm_password: passwords.confirm }),
-      });
-
-      const body = await resp.json().catch(() => ({}));
-
-      if (!resp.ok) {
-        toast({ variant: 'destructive', title: 'Error', description: (body && (body.error || body.message)) || 'No se pudo actualizar la contraseña.' });
-        return;
-      }
-
-      toast({ title: 'Contraseña actualizada', description: 'La contraseña se ha actualizado. Se cerrará la sesión.' });
-      setTimeout(() => logout(), 1200);
+      toast({ title: 'Pendiente de API', description: 'El cambio de contraseña se habilitará con el endpoint de perfil.' });
+      setTimeout(() => logout(), 2000);
     } catch (error) {
       toast({ variant: 'destructive', title: 'Error', description: 'No se pudo actualizar la contraseña.' });
     } finally {
@@ -180,17 +182,15 @@ function ProfileContent() {
   const handleAddMethod = async (e: React.FormEvent) => {
     e.preventDefault();
     const method: PaymentMethod = {
-      id: (newMethod.id as string) || crypto.randomUUID(),
+      id: crypto.randomUUID(),
       type: newMethod.type as 'qr' | 'bank',
       label: newMethod.label || '',
       value: newMethod.value || '',
-      qrImage: newMethod.qrImage,
-      holder: newMethod.holder || undefined,
-      cci: newMethod.cci || undefined,
+      qrImage: newMethod.qrImage
     };
     await db.put('payment_methods', method);
     setIsMethodOpen(false);
-    setNewMethod({ type: 'bank', label: '', value: '', qrImage: '', holder: '', cci: '', id: undefined });
+    setNewMethod({ type: 'bank', label: '', value: '', qrImage: '' });
     toast({ title: "Medio de pago agregado" });
     loadMethods();
   };
@@ -212,7 +212,7 @@ function ProfileContent() {
   };
 
   return (
-    <AppLayout>
+    <AppLayout isPayModalOpen={isPayModalOpen} setIsPayModalOpen={setIsPayModalOpen}>
       <div className="max-w-5xl mx-auto space-y-8">
         <div className="flex justify-between items-center">
           <div>
@@ -226,6 +226,7 @@ function ProfileContent() {
           <TabsList className="bg-muted p-1 rounded-2xl h-auto w-full md:w-fit flex-wrap">
             <TabsTrigger value="security" className="py-2.5 px-6 gap-2 rounded-xl data-[state=active]:shadow-lg"><Lock className="w-4 h-4" /> Seguridad</TabsTrigger>
             <TabsTrigger value="appearance" className="py-2.5 px-6 gap-2 rounded-xl data-[state=active]:shadow-lg"><Palette className="w-4 h-4" /> Identidad de Marca</TabsTrigger>
+            <TabsTrigger value="subscription" className="py-2.5 px-6 gap-2 rounded-xl data-[state=active]:shadow-lg"><CreditCard className="w-4 h-4" /> Suscripción</TabsTrigger>
             {isAdmin && <TabsTrigger value="billing" className="py-2.5 px-6 gap-2 rounded-xl data-[state=active]:shadow-lg"><Wallet className="w-4 h-4" /> Medios de Pago</TabsTrigger>}
           </TabsList>
 
@@ -235,33 +236,9 @@ function ProfileContent() {
                 <CardHeader><CardTitle className="text-lg flex items-center gap-2"><ShieldCheck className="w-5 h-5 text-primary" /> Cambiar Contraseña</CardTitle></CardHeader>
                 <form onSubmit={handleChangePassword}>
                   <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Contraseña Actual</Label>
-                      <div className="relative">
-                        <Input type={showCurrent ? 'text' : 'password'} value={passwords.current} onChange={e => setPasswords({...passwords, current: e.target.value})} required className="rounded-xl h-12 bg-slate-50 dark:bg-slate-900 pr-12" />
-                        <button type="button" onClick={() => setShowCurrent(prev => !prev)} aria-label={showCurrent ? 'Ocultar contraseña actual' : 'Mostrar contraseña actual'} className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground">
-                          {showCurrent ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                        </button>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Nueva Contraseña</Label>
-                      <div className="relative">
-                        <Input type={showNew ? 'text' : 'password'} value={passwords.new} onChange={e => setPasswords({...passwords, new: e.target.value})} required className="rounded-xl h-12 bg-slate-50 dark:bg-slate-900 pr-12" />
-                        <button type="button" onClick={() => setShowNew(prev => !prev)} aria-label={showNew ? 'Ocultar nueva contraseña' : 'Mostrar nueva contraseña'} className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground">
-                          {showNew ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                        </button>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Confirmar Nueva Contraseña</Label>
-                      <div className="relative">
-                        <Input type={showConfirm ? 'text' : 'password'} value={passwords.confirm} onChange={e => setPasswords({...passwords, confirm: e.target.value})} required className="rounded-xl h-12 bg-slate-50 dark:bg-slate-900 pr-12" />
-                        <button type="button" onClick={() => setShowConfirm(prev => !prev)} aria-label={showConfirm ? 'Ocultar confirmar contraseña' : 'Mostrar confirmar contraseña'} className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground">
-                          {showConfirm ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                        </button>
-                      </div>
-                    </div>
+                    <div className="space-y-2"><Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Contraseña Actual</Label><Input type="password" value={passwords.current} onChange={e => setPasswords({...passwords, current: e.target.value})} required className="rounded-xl h-12 bg-slate-50 dark:bg-slate-900" /></div>
+                    <div className="space-y-2"><Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Nueva Contraseña</Label><Input type="password" value={passwords.new} onChange={e => setPasswords({...passwords, new: e.target.value})} required className="rounded-xl h-12 bg-slate-50 dark:bg-slate-900" /></div>
+                    <div className="space-y-2"><Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Confirmar Nueva Contraseña</Label><Input type="password" value={passwords.confirm} onChange={e => setPasswords({...passwords, confirm: e.target.value})} required className="rounded-xl h-12 bg-slate-50 dark:bg-slate-900" /></div>
                   </CardContent>
                   <CardFooter><Button type="submit" className="w-full h-14 text-lg font-black rounded-2xl shadow-xl shadow-primary/20" disabled={isChanging}>{isChanging ? 'Procesando...' : 'Guardar Nueva Contraseña'}</Button></CardFooter>
                 </form>
@@ -274,6 +251,9 @@ function ProfileContent() {
                     <div className="flex justify-between items-center"><span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Acceso:</span><span className="text-sm font-black text-primary">{user.username}</span></div>
                     <div className="flex justify-between items-center"><span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Rol:</span><Badge variant="outline" className="font-black text-[10px] uppercase">{user.role}</Badge></div>
                   </div>
+                  <Button onClick={logout} variant="outline" className="w-full h-12 rounded-2xl font-bold gap-2 text-destructive hover:text-destructive border-destructive/20 hover:bg-destructive/5">
+                    <LogOut className="w-4 h-4" /> Cerrar Sesión
+                  </Button>
                 </CardContent>
               </Card>
             </div>
@@ -387,6 +367,56 @@ function ProfileContent() {
             </div>
           </TabsContent>
 
+          <TabsContent value="subscription" className="animate-in fade-in duration-500">
+            <Card className="border-none shadow-xl shadow-slate-200/50 dark:shadow-none bg-white dark:bg-slate-950 rounded-3xl">
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <CreditCard className="w-5 h-5 text-primary" /> Estado de Suscripción
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="p-5 bg-white dark:bg-slate-900 rounded-[1.5rem] border shadow-sm space-y-3">
+                  <div className="flex justify-between items-center">
+                    <p className="text-[10px] uppercase font-black text-muted-foreground tracking-widest leading-none">Status Acceso</p>
+                    <Badge 
+                      variant={currentStatus === 'active' ? 'default' : 'destructive'} 
+                      className={cn(
+                        "text-[9px] h-5 font-black px-2 uppercase tracking-tighter",
+                        isOverdue && "bg-amber-500 hover:bg-amber-600",
+                        currentStatus === 'active' && "bg-emerald-500 hover:bg-emerald-600"
+                      )}
+                    >
+                      {isBlocked ? 'BLOQUEADO' : isSuspended ? 'SUSPENDIDO' : isOverdue ? 'EN MORA' : 'ACTIVO'}
+                    </Badge>
+                  </div>
+                  <div className="space-y-2">
+                    <p className="flex justify-between text-[11px] font-bold">
+                      <span className="text-muted-foreground">ABONO:</span>
+                      <span className="text-primary">S/. {subscriptionFee.toFixed(2)}</span>
+                    </p>
+                    {user.nextPaymentDate && (
+                      <p className="flex justify-between text-[11px] font-bold">
+                        <span className="text-muted-foreground">LÍMITE:</span>
+                        <span className={cn(isOverdue ? "text-amber-600" : "text-slate-600 dark:text-slate-400")}>
+                          {format(parseISO(user.nextPaymentDate), 'dd/MM/yyyy')}
+                        </span>
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <Button 
+                  variant="default" 
+                  size="sm" 
+                  className="w-full h-12 text-[10px] font-black gap-3 shadow-xl shadow-primary/20 rounded-2xl uppercase tracking-widest transition-transform active:scale-95" 
+                  onClick={() => setIsPayModalOpen(true)}
+                >
+                  <Wallet className="w-4 h-4" />
+                  Pagar / Renovar
+                </Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           {isAdmin && (
             <TabsContent value="billing" className="animate-in fade-in duration-500">
               <Card className="border-none shadow-xl shadow-slate-200/50 dark:shadow-none bg-white dark:bg-slate-950 rounded-3xl">
@@ -402,13 +432,10 @@ function ProfileContent() {
                           <div className="flex items-start gap-5">
                             <div className="p-5 bg-white dark:bg-slate-800 rounded-2xl text-primary shadow-sm border border-slate-100 dark:border-slate-700 transition-transform group-hover:scale-105"><QrCode className="w-8 h-8" /></div>
                             <div className="flex-1 min-w-0">
-                                <p className="font-black text-[10px] uppercase text-muted-foreground tracking-widest mb-1">{m.label}</p>
-                                <p className="text-lg font-black break-all text-slate-800 dark:text-white leading-tight">{m.value}</p>
-                                  {m.cci && <p className="text-sm text-muted-foreground mt-2">CCI: <span className="font-bold">{m.cci}</span></p>}
-                                  <p className="text-sm text-muted-foreground mt-2">Titular: <span className="font-bold">{m.holder || '---'}</span></p>
+                              <p className="font-black text-[10px] uppercase text-muted-foreground tracking-widest mb-1">{m.label}</p>
+                              <p className="text-lg font-black break-all text-slate-800 dark:text-white leading-tight">{m.value}</p>
                             </div>
                           </div>
-                          <Button variant="ghost" size="icon" onClick={() => { setNewMethod(m); setIsMethodOpen(true); }} className="absolute top-3 right-12 opacity-0 group-hover:opacity-100 transition-opacity bg-white/50 dark:bg-slate-800/50 rounded-full"><Edit className="w-5 h-5" /></Button>
                           <Button variant="ghost" size="icon" onClick={() => deleteMethod(m.id)} className="absolute top-3 right-3 text-destructive opacity-0 group-hover:opacity-100 transition-opacity bg-white/50 dark:bg-slate-800/50 rounded-full hover:bg-red-50"><Trash2 className="w-5 h-5" /></Button>
                         </CardContent>
                       </Card>
@@ -421,6 +448,7 @@ function ProfileContent() {
                     )}
                   </div>
                 </CardContent>
+
               </Card>
             </TabsContent>
           )}
@@ -436,8 +464,6 @@ function ProfileContent() {
               <div className="space-y-2"><Label className="text-xs font-bold uppercase tracking-widest">Tipo de Medio</Label><Select value={newMethod.type} onValueChange={v => setNewMethod({...newMethod, type: v as any})}><SelectTrigger className="h-12 rounded-2xl"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="bank">Cuenta Bancaria (Transferencia)</SelectItem><SelectItem value="qr">Código QR (Yape/Plin)</SelectItem></SelectContent></Select></div>
               <div className="space-y-2"><Label className="text-xs font-bold uppercase tracking-widest">Entidad / Banco</Label><Input value={newMethod.label} onChange={e => setNewMethod({...newMethod, label: e.target.value})} required className="h-12 rounded-2xl bg-slate-50" placeholder="Ej: BCP Soles" /></div>
               <div className="space-y-2"><Label className="text-xs font-bold uppercase tracking-widest">Número / Dato</Label><Input value={newMethod.value} onChange={e => setNewMethod({...newMethod, value: e.target.value})} required className="h-12 rounded-2xl bg-slate-50" placeholder="Ej: 191-234567-0-91" /></div>
-              <div className="space-y-2"><Label className="text-xs font-bold uppercase tracking-widest">CCI (Opcional)</Label><Input value={newMethod.cci} onChange={e => setNewMethod({...newMethod, cci: e.target.value})} className="h-12 rounded-2xl bg-slate-50" placeholder="Ej: 106042321009293744" /></div>
-              <div className="space-y-2"><Label className="text-xs font-bold uppercase tracking-widest">Nombre del Titular</Label><Input value={newMethod.holder} onChange={e => setNewMethod({...newMethod, holder: e.target.value})} className="h-12 rounded-2xl bg-slate-50" placeholder="Ej: Juan Perez" /></div>
               {newMethod.type === 'qr' && <div className="space-y-2"><Label className="text-xs font-bold uppercase tracking-widest">Imagen del Código QR</Label><div className="flex items-center gap-4 bg-slate-50 p-4 rounded-2xl border-2 border-dashed"><QrCode className="w-8 h-8 opacity-20" /><Input type="file" accept="image/*" onChange={handleQrUpload} className="h-10 border-none bg-transparent shadow-none" /></div></div>}
               <Button type="submit" className="w-full h-16 text-lg font-black rounded-2xl shadow-xl shadow-primary/20 mt-4">Guardar Configuración</Button>
             </form>

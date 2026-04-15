@@ -4,7 +4,6 @@ const bcrypt = require('bcryptjs');
 const prisma = new PrismaClient();
 
 async function main() {
-  // Buscar o crear la clínica demo.local
   const clinic = await prisma.clinic.upsert({
     where: { domain: 'demo.local' },
     update: {},
@@ -16,28 +15,28 @@ async function main() {
     },
   });
 
-  const hash = await bcrypt.hash('Admin12345', 12);
+  const hash = await bcrypt.hash('Demo12345', 12);
 
   await prisma.user.upsert({
-    where: { email: 'admin@demo.com' },
+    where: { email: 'demo@clinic.com' },
     update: {
       clinic_id: clinic.id,
       password_hash: hash,
       status: 'active',
-      role: 'admin',
-      full_name: 'Administrador General',
+      role: 'clinic_owner',
+      full_name: 'Demo Owner',
     },
     create: {
       clinic_id: clinic.id,
-      email: 'admin@demo.com',
+      email: 'demo@clinic.com',
       password_hash: hash,
       status: 'active',
-      role: 'admin',
-      full_name: 'Administrador General',
+      role: 'clinic_owner',
+      full_name: 'Demo Owner',
     },
   });
 
-  console.log('SEED_ADMIN_OK', clinic.id);
+  console.log('SEED_OK', clinic.id);
 }
 
 main()

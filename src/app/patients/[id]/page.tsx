@@ -3,7 +3,7 @@
 import { useState, useEffect, use } from 'react';
 import { AuthProvider } from '@/hooks/use-auth';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { Patient, Appointment, Payment, Odontogram } from '@/lib/legacy-data';
+import { db, Patient, Radiograph, Consent, Appointment, Payment, Odontogram } from '@/lib/legacy-data';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,7 +17,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PaymentModal } from '../../../components/PaymentModal';
-import { subirArchivoExterno } from '@/lib/external-upload';
 
 type ApiEnvelope<T> = {
   success?: boolean;
@@ -139,85 +138,17 @@ type OdontogramApi = {
   created_at: string;
 };
 
-type RadiographApi = {
-  id: string;
-  patient_id: string;
-  appointment_id?: string | null;
-  file_url: string;
-  file_name: string;
-  mime_type?: string | null;
-  type?: string | null;
-  created_at: string;
-};
-
-type ConsentApi = {
-  id: string;
-  patient_id: string;
-  consent_type: string;
-  document_url?: string | null;
-  created_at: string;
-};
-
-type RadiographItem = {
-  id: string;
-  patientId: string;
-  appointmentId?: string;
-  fileUrl: string;
-  type?: string;
-  date: string;
-  fileType: string;
-  fileName: string;
-};
-
-type ConsentItem = {
-  id: string;
-  patientId: string;
-  type: string;
-  date: string;
-  fileUrl: string;
-  fileType: string;
-  fileName: string;
-};
-
-const mimeTypeByExtension: Record<string, string> = {
-  pdf: 'application/pdf',
-  png: 'image/png',
-  jpg: 'image/jpeg',
-  jpeg: 'image/jpeg',
-  webp: 'image/webp',
-  gif: 'image/gif',
-  svg: 'image/svg+xml',
-};
-
-const inferMimeTypeFromFileName = (name: string): string => {
-  const cleanName = name.split('?')[0].split('#')[0];
-  const extension = cleanName.includes('.') ? cleanName.split('.').pop()?.toLowerCase() : undefined;
-  return extension ? mimeTypeByExtension[extension] || 'application/octet-stream' : 'application/octet-stream';
-};
-
-const getFileNameFromUrl = (url: string, fallback: string): string => {
-  try {
-    const parsed = new URL(url);
-    const lastSegment = parsed.pathname.split('/').filter(Boolean).pop();
-    return decodeURIComponent(lastSegment || fallback);
-  } catch {
-    const cleanUrl = url.split('?')[0];
-    const lastSegment = cleanUrl.split('/').filter(Boolean).pop();
-    return decodeURIComponent(lastSegment || fallback);
-  }
-};
-
 export default function PatientDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { toast } = useToast();
   const [patient, setPatient] = useState<Patient | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
-  const [radiographs, setRadiographs] = useState<RadiographItem[]>([]);
-  const [consents, setConsents] = useState<ConsentItem[]>([]);
+  const [radiographs, setRadiographs] = useState<Radiograph[]>([]);
+  const [consents, setConsents] = useState<Consent[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [odontograms, setOdontograms] = useState<Odontogram[]>([]);
   
-  const [previewData, setPreviewData] = useState<{ url: string; type: string; isObjectUrl?: boolean } | null>(null);
+  const [previewData, setPreviewData] = useState<{ url: string; type: string } | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [paymentForm, setPaymentForm] = useState({ amount: '', method: 'cash', notes: '' });
@@ -229,13 +160,11 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
 
   const loadAll = async () => {
     try {
-      const [patientApi, paymentsApi, appointmentsApi, odontogramsApi, radiographsApi, consentsApi] = await Promise.all([
+      const [patientApi, paymentsApi, appointmentsApi, odontogramsApi] = await Promise.all([
         fetchApi<PatientApi>(`/api/patients/${id}`),
         fetchApi<{ items: PaymentApi[] }>(`/api/payments?patient_id=${id}`),
         fetchApi<{ items: AppointmentApi[] }>(`/api/appointments?patient_id=${id}`),
         fetchApi<{ items: OdontogramApi[] }>(`/api/odontograms?patient_id=${id}`),
-        fetchApi<{ items: RadiographApi[] }>(`/api/radiographs?patient_id=${id}`),
-        fetchApi<{ items: ConsentApi[] }>(`/api/consents?patient_id=${id}`),
       ]);
 
       const nameParts = splitFullName(patientApi.full_name);
@@ -329,42 +258,9 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
           }))
       );
 
-      setRadiographs(
-        (radiographsApi.items || [])
-          .sort((a, b) => parseDateValue(b.created_at) - parseDateValue(a.created_at))
-          .map((item): RadiographItem => ({
-            id: item.id,
-            patientId: item.patient_id,
-            appointmentId: item.appointment_id || undefined,
-            fileUrl: item.file_url,
-            type: item.type || undefined,
-            date: toDisplayDate(item.created_at),
-            fileType: item.mime_type || inferMimeTypeFromFileName(item.file_name),
-            fileName: item.file_name,
-          }))
-      );
-
-      setConsents(
-        (consentsApi.items || [])
-          .filter((item) => Boolean(item.document_url))
-          .sort((a, b) => parseDateValue(b.created_at) - parseDateValue(a.created_at))
-          .map((item, index): ConsentItem => {
-            const fileUrl = String(item.document_url);
-            const fallbackName = `consentimiento-${index + 1}`;
-            const fileName = getFileNameFromUrl(fileUrl, fallbackName);
-
-            return {
-              id: item.id,
-              patientId: item.patient_id,
-              type: item.consent_type,
-              date: toDisplayDate(item.created_at),
-              fileUrl,
-              fileType: inferMimeTypeFromFileName(fileName),
-              fileName,
-            };
-          })
-      );
-
+      // No existen endpoints REST para estos modulos en la version actual.
+      setRadiographs([]);
+      setConsents([]);
       setOdontograms(
         (odontogramsApi.items || [])
           .sort((a, b) => parseDateValue(b.created_at) - parseDateValue(a.created_at))
@@ -388,149 +284,57 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
     }
   };
 
-  const uploadImage = async (file: File) => {
-    const url = await subirArchivoExterno(file);
-    if (!url) {
-      throw new Error('No se pudo subir la imagen');
-    }
-
-    return { url };
-  };
-
-  const saveRadiograph = async (data: {
-    patient_id: string;
-    appointment_id?: string;
-    file_url: string;
-    file_name: string;
-    file_size: number;
-    mime_type?: string;
-    type?: string;
-    notes?: string;
-  }) => {
-    const response = await fetch('/api/radiographs', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify(data),
-    });
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'No se pudo guardar la radiografía');
-    }
-    return await response.json();
-  };
-
-  const saveConsent = async (data: {
-    patient_id: string;
-    appointment_id?: string;
-    consent_type: string;
-    document_url: string;
-    notes?: string;
-  }) => {
-    const response = await fetch('/api/consents', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify(data),
-    });
-    if (!response.ok) {
-      const error = await response.json().catch(() => null);
-      throw new Error(error?.error || 'No se pudo guardar el consentimiento');
-    }
-    return await response.json();
-  };
-
   const handleFileUpload = async (type: 'radiograph' | 'consent', e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    const data: any = {
+      id: crypto.randomUUID(),
+      patientId: id,
+      fileName: file.name,
+      fileType: file.type,
+      fileBlob: file, 
+      date: new Date().toLocaleDateString('es-PE'),
+    };
+
+    const store = type === 'radiograph' ? 'radiographs' : 'consents';
     try {
-      // 1. Subir imagen
-      const uploadResult = await uploadImage(file);
-      // 2. Guardar registro en la base de datos
-      if (type === 'radiograph') {
-        await saveRadiograph({
-          patient_id: id,
-          file_url: uploadResult.url,
-          file_name: file.name,
-          file_size: file.size,
-          mime_type: file.type,
-        });
-      } else {
-        await saveConsent({
-          patient_id: id,
-          consent_type: file.type.includes('pdf') ? 'consentimiento_pdf' : 'consentimiento_imagen',
-          document_url: uploadResult.url,
-        });
-      }
-      toast({ title: "Archivo subido", description: "El documento se guardó correctamente." });
+      await db.put(store, data);
+      toast({ title: "Archivo subido", description: "El documento se guardo correctamente." });
       loadAll();
     } catch (error) {
       toast({
-        title: 'Error al subir archivo',
-        description: error instanceof Error ? error.message : 'No se pudo guardar la imagen.',
+        title: 'Modulo en migracion',
+        description: error instanceof Error ? error.message : 'Aun no se pudo guardar este archivo.',
         variant: 'destructive',
       });
     }
-    e.target.value = '';
+    e.target.value = ''; 
   };
 
-  const downloadFile = (fileSource: Blob | string, fileName: string) => {
-    const url = typeof fileSource === 'string' ? fileSource : URL.createObjectURL(fileSource);
+  const downloadFile = (fileBlob: Blob, fileName: string) => {
+    const url = URL.createObjectURL(fileBlob);
     const a = document.createElement('a');
     a.href = url;
     a.download = fileName;
     a.click();
-    if (typeof fileSource !== 'string') {
-      URL.revokeObjectURL(url);
-    }
+    URL.revokeObjectURL(url);
   };
 
-  const closePreview = () => {
-    setPreviewData((prev) => {
-      if (prev?.isObjectUrl) {
-        URL.revokeObjectURL(prev.url);
-      }
-      return null;
-    });
-  };
-
-  const openPreview = (file: string | Blob, fileType: string) => {
-    setPreviewData((prev) => {
-      if (prev?.isObjectUrl) {
-        URL.revokeObjectURL(prev.url);
-      }
-
-      if (typeof file === 'string') {
-        return { url: file, type: fileType };
-      }
-
-      return {
-        url: URL.createObjectURL(file),
-        type: fileType,
-        isObjectUrl: true,
-      };
-    });
+  const openPreview = (fileBlob: Blob, fileType: string) => {
+    const url = URL.createObjectURL(fileBlob);
+    setPreviewData({ url, type: fileType });
   };
 
   const deleteFile = async (store: 'radiographs' | 'consents', fileId: string) => {
     if (confirm("¿Eliminar este archivo permanentemente?")) {
       try {
-        const endpoint = store === 'radiographs' ? `/api/radiographs/${fileId}` : `/api/consents/${fileId}`;
-        const response = await fetch(endpoint, {
-          method: 'DELETE',
-          credentials: 'include',
-        });
-
-        if (!response.ok) {
-          const error = await response.json().catch(() => null);
-          throw new Error(error?.error || 'No se pudo eliminar el archivo');
-        }
-
+        await db.delete(store, fileId);
         loadAll();
       } catch (error) {
         toast({
-          title: 'Error al eliminar archivo',
-          description: error instanceof Error ? error.message : 'No se pudo eliminar este archivo.',
+          title: 'Modulo en migracion',
+          description: error instanceof Error ? error.message : 'Aun no se pudo eliminar este archivo.',
           variant: 'destructive',
         });
       }
@@ -539,9 +343,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
 
   const openPaymentModal = (appointment: Appointment) => {
     setSelectedAppointment(appointment);
-    const existingPayments = payments.filter((p) => p.appointmentId === appointment.id && !String(p.id).startsWith('pending-'));
-    const remaining = existingPayments.length > 0 ? existingPayments.reduce((acc, p) => acc + p.balance, 0) : appointment.cost;
-    setPaymentForm({ amount: remaining.toFixed(2), method: 'cash', notes: '' });
+    setPaymentForm({ amount: appointment.cost.toFixed(2), method: 'cash', notes: '' });
     setShowPaymentModal(true);
   };
 
@@ -553,34 +355,19 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
 
     setIsSubmittingPayment(true);
     try {
-      const existingPayment = payments.find((p) => p.appointmentId === selectedAppointment.id && !String(p.id).startsWith('pending-'));
-      let response: Response;
-      if (existingPayment) {
-        response = await fetch(`/api/payments/${existingPayment.id}/history`, {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            amount_paid: Number(paymentForm.amount),
-            payment_method: paymentForm.method,
-            reference: paymentForm.notes,
-          }),
-        });
-      } else {
-        response = await fetch('/api/payments', {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            patient_id: id,
-            appointment_id: selectedAppointment.id,
-            amount: Number(paymentForm.amount),
-            payment_method: paymentForm.method,
-            notes: paymentForm.notes,
-            total_cost: selectedAppointment.cost,
-          }),
-        });
-      }
+      const response = await fetch('/api/payments', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          patient_id: id,
+          appointment_id: selectedAppointment.id,
+          amount: Number(paymentForm.amount),
+          payment_method: paymentForm.method,
+          notes: paymentForm.notes,
+          total_cost: selectedAppointment.cost,
+        }),
+      });
 
       if (!response.ok) {
         const error = await response.json();
@@ -614,7 +401,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
                 <Link href="/patients"><ChevronLeft /></Link>
               </Button>
               <div>
-                <h2 className="text-3xl font-bold text-primary">{`${patient.names}${patient.lastNames ? ` ${patient.lastNames}` : ''}`.toUpperCase()}</h2>
+                <h2 className="text-3xl font-bold text-primary">{patient.lastNames}, {patient.names}</h2>
                 <div className="flex gap-4 mt-1">
                   <Badge variant="outline" className="border-primary text-primary">DNI: {patient.dni}</Badge>
                   <span className="text-sm text-muted-foreground">Paciente desde: {patient.registrationDate}</span>
@@ -717,11 +504,12 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
                    {radiographs.map(r => (
                      <Card key={r.id} className="overflow-hidden group relative border-none shadow-sm hover:shadow-md transition-all">
-                       <div className="aspect-square bg-slate-100 flex items-center justify-center overflow-hidden cursor-pointer" onClick={() => openPreview(r.fileUrl, r.fileType)}>
+                       <div className="aspect-square bg-slate-100 flex items-center justify-center overflow-hidden cursor-pointer" onClick={() => openPreview(r.fileBlob, r.fileType)}>
                           <img 
-                            src={r.fileUrl} 
+                            src={URL.createObjectURL(r.fileBlob)} 
                             className="w-full h-full object-cover transition-transform group-hover:scale-105" 
                             alt={r.fileName}
+                            onLoad={(e) => URL.revokeObjectURL((e.target as any).src)}
                           />
                           <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                             <ZoomIn className="text-white w-8 h-8" />
@@ -732,7 +520,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
                           <p className="text-[9px] text-muted-foreground">{r.date}</p>
                        </div>
                        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
-                         <Button variant="secondary" size="icon" className="h-7 w-7" onClick={() => downloadFile(r.fileUrl, r.fileName)}><Download className="w-3 h-3" /></Button>
+                         <Button variant="secondary" size="icon" className="h-7 w-7" onClick={() => downloadFile(r.fileBlob, r.fileName)}><Download className="w-3 h-3" /></Button>
                          <Button variant="destructive" size="icon" className="h-7 w-7" onClick={() => deleteFile('radiographs', r.id)}><Trash2 className="w-3 h-3" /></Button>
                        </div>
                      </Card>
@@ -773,7 +561,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
                           </div>
                        </div>
                        <div className="flex gap-2">
-                          <Button variant="ghost" size="sm" onClick={() => openPreview(c.fileUrl, c.fileType)}>Previsualizar</Button>
+                          <Button variant="ghost" size="sm" onClick={() => openPreview(c.fileBlob, c.fileType)}>Previsualizar</Button>
                           <Button variant="ghost" size="icon" className="text-destructive opacity-0 group-hover:opacity-100" onClick={() => deleteFile('consents', c.id)}><Trash2 className="w-4 h-4" /></Button>
                        </div>
                      </Card>
@@ -891,8 +679,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
                       </TableHeader>
                       <TableBody>
                         {appointments.map(a => {
-                          const totalPaidForAppointment = payments.reduce((acc, p) => (p.appointmentId === a.id ? acc + p.totalPaid : acc), 0);
-                          const isFullyPaid = totalPaidForAppointment >= a.cost;
+                          const hasPaidForAppointment = payments.some(p => p.appointmentId === a.id);
                           return (
                             <TableRow key={a.id}>
                               <TableCell className="font-medium">{a.date} - {a.time}</TableCell>
@@ -901,14 +688,13 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
                               <TableCell className="font-bold">S/. {a.cost.toFixed(2)}</TableCell>
                               <TableCell className="text-xs italic">{a.observations || '-'}</TableCell>
                               <TableCell>
-                                {isFullyPaid ? (
-                                  <Badge variant="default" className="bg-emerald-500">Pagado</Badge>
-                                ) : a.status === 'Atendido' ? (
+                                {a.status === 'Atendido' && !hasPaidForAppointment && (
                                   <Button size="sm" variant="outline" onClick={() => openPaymentModal(a)}>
                                     Registrar Pago
                                   </Button>
-                                ) : (
-                                  <Badge variant="outline" className="text-amber-600 border-amber-600">PENDIENTE</Badge>
+                                )}
+                                {hasPaidForAppointment && (
+                                  <Badge variant="default" className="bg-emerald-500">Pagado</Badge>
                                 )}
                               </TableCell>
                             </TableRow>
@@ -923,13 +709,11 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
         </div>
 
         {/* Modal de Zoom General y PDF Preview */}
-        <Dialog open={!!previewData} onOpenChange={(open) => {
-          if (!open) closePreview();
-        }}>
+        <Dialog open={!!previewData} onOpenChange={() => setPreviewData(null)}>
            <DialogContent className="max-w-[95vw] h-[95vh] flex flex-col p-0 bg-black/95 border-none">
               <div className="flex justify-between items-center p-4 bg-black/40 text-white z-50">
                 <span className="text-sm font-medium">Previsualización de Documento</span>
-                <Button variant="ghost" size="icon" className="text-white hover:bg-white/20" onClick={closePreview}>
+                <Button variant="ghost" size="icon" className="text-white hover:bg-white/20" onClick={() => setPreviewData(null)}>
                   <X className="w-6 h-6" />
                 </Button>
               </div>
