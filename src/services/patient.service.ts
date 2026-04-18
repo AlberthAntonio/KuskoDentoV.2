@@ -97,7 +97,7 @@ export const patientService = {
     dni: string;
     full_name: string;
     phone: string;
-    address: string;
+    address?: string;
     email?: string;
     first_name?: string;
     last_name?: string;
@@ -122,7 +122,7 @@ export const patientService = {
         dni: data.dni,
         full_name: data.full_name,
         phone: data.phone,
-        address: data.address,
+        address: data.address ?? null,
         email: data.email,
         first_name: data.first_name,
         last_name: data.last_name,

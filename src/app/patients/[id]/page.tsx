@@ -106,7 +106,14 @@ type PaymentApi = {
   total_paid: string | number;
   balance: string | number;
   created_at?: string | null;
-  appointment?: { treatment?: { name?: string | null } | null } | null;
+  appointment?: {
+    treatment?: { name?: string | null } | null;
+    appointment_treatments?: Array<{
+      treatment?: { name?: string | null } | null;
+      price: string | number;
+      observations?: string | null;
+    }>;
+  } | null;
   payment_histories?: Array<{
     amount_paid: string | number;
     payment_date: string;
@@ -120,6 +127,11 @@ type AppointmentApi = {
   patient?: { id?: string | null } | null;
   treatment_id?: string | null;
   treatment?: { name?: string | null } | null;
+  appointment_treatments?: Array<{
+    treatment?: { name?: string | null } | null;
+    price: string | number;
+    observations?: string | null;
+  }>;
   doctor_id?: string | null;
   doctor?: { full_name?: string | null } | null;
   date: string;
@@ -192,21 +204,30 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
 
       const mappedPayments = (paymentsApi.items || [])
         .sort((a, b) => parseDateValue(b.created_at) - parseDateValue(a.created_at))
-        .map((payment): Payment => ({
-          id: payment.id,
-          patientId: payment.patient_id,
-          appointmentId: payment.appointment_id,
-          treatmentName: payment.appointment?.treatment?.name || 'Consulta',
-          totalPaid: toNumber(payment.total_paid),
-          balance: toNumber(payment.balance),
-          totalCost: toNumber(payment.total_cost),
-          date: toDisplayDate(payment.created_at),
-          history: (payment.payment_histories || []).map((item) => ({
-            amount: toNumber(item.amount_paid),
-            date: toDisplayDate(item.payment_date),
-            method: item.payment_method || undefined,
-          })),
-        }));
+        .map((payment): Payment => {
+          const services = payment.appointment?.appointment_treatments
+            ?.map((item) => item.treatment?.name || '')
+            .filter((name) => Boolean(name));
+          const treatmentName = services && services.length > 0
+            ? services.join(', ')
+            : payment.appointment?.treatment?.name || 'Consulta';
+
+          return {
+            id: payment.id,
+            patientId: payment.patient_id,
+            appointmentId: payment.appointment_id,
+            treatmentName,
+            totalPaid: toNumber(payment.total_paid),
+            balance: toNumber(payment.balance),
+            totalCost: toNumber(payment.total_cost),
+            date: toDisplayDate(payment.created_at),
+            history: (payment.payment_histories || []).map((item) => ({
+              amount: toNumber(item.amount_paid),
+              date: toDisplayDate(item.payment_date),
+              method: item.payment_method || undefined,
+            })),
+          };
+        });
 
       const paidAppointmentIds = new Set(
         mappedPayments.map((payment) => payment.appointmentId).filter(Boolean)
@@ -220,17 +241,26 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
             !paidAppointmentIds.has(appointment.id)
           );
         })
-        .map((appointment): Payment => ({
-          id: `pending-${appointment.id}`,
-          patientId: appointment.patient_id || appointment.patient?.id || id,
-          appointmentId: appointment.id,
-          treatmentName: appointment.treatment?.name || 'Consulta',
-          totalPaid: 0,
-          balance: toNumber(appointment.cost),
-          totalCost: toNumber(appointment.cost),
-          date: toDisplayDate(appointment.date),
-          history: [],
-        }));
+        .map((appointment): Payment => {
+          const services = (appointment.appointment_treatments || [])
+            .map((item) => item.treatment?.name || '')
+            .filter((name) => Boolean(name));
+          const treatmentName = services.length > 0
+            ? services.join(', ')
+            : appointment.treatment?.name || 'Consulta';
+
+          return {
+            id: `pending-${appointment.id}`,
+            patientId: appointment.patient_id || appointment.patient?.id || id,
+            appointmentId: appointment.id,
+            treatmentName,
+            totalPaid: 0,
+            balance: toNumber(appointment.cost),
+            totalCost: toNumber(appointment.cost),
+            date: toDisplayDate(appointment.date),
+            history: [],
+          };
+        });
 
       setPayments(
         [...mappedPayments, ...pendingFromAppointments].sort(
@@ -241,7 +271,20 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
       setAppointments(
         (appointmentsApi.items || [])
           .sort((a, b) => parseDateValue(b.date) - parseDateValue(a.date))
-          .map((appointment): Appointment => ({
+          .map((appointment): Appointment => {
+            const services = (appointment.appointment_treatments || [])
+              .map((item) => ({
+                name: item.treatment?.name || 'Consulta',
+                cost: toNumber(item.price),
+                observations: item.observations || undefined,
+              }))
+              .filter((item) => item.name || item.cost > 0);
+
+            const treatmentName = services.length > 0
+              ? services.map((service) => service.name).join(', ')
+              : appointment.treatment?.name || 'Consulta';
+
+            return {
             id: appointment.id,
             patientId: appointment.patient_id || appointment.patient?.id || '',
             treatmentId: appointment.treatment_id || '',
@@ -255,7 +298,10 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
                 : 'Asignado',
             cost: toNumber(appointment.cost),
             observations: appointment.observations || undefined,
-          }))
+            treatmentName,
+            services,
+            };
+          })
       );
 
       // No existen endpoints REST para estos modulos en la version actual.
@@ -419,14 +465,71 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
           </div>
 
           <Tabs defaultValue="overview" className="space-y-6">
-            <TabsList className="bg-muted p-1 rounded-xl h-auto flex flex-wrap justify-start gap-1">
+            <TabsList className="bg-muted p-1 rounded-xl h-auto flex flex-nowrap justify-start gap-1 overflow-x-auto scrollbar-thin">
               <TabsTrigger value="overview" className="gap-2 py-3 px-6"><Eye className="w-4 h-4" /> Resumen</TabsTrigger>
               <TabsTrigger value="radiographs" className="gap-2 py-3 px-6"><ImageIcon className="w-4 h-4" /> Radiografías</TabsTrigger>
               <TabsTrigger value="consents" className="gap-2 py-3 px-6"><FileText className="w-4 h-4" /> Consentimientos</TabsTrigger>
               <TabsTrigger value="odontograms" className="gap-2 py-3 px-6"><Activity className="w-4 h-4" /> Odontogramas</TabsTrigger>
               <TabsTrigger value="payments" className="gap-2 py-3 px-6"><CreditCard className="w-4 h-4" /> Pagos/Saldos</TabsTrigger>
               <TabsTrigger value="appointments" className="gap-2 py-3 px-6"><Calendar className="w-4 h-4" /> Citas</TabsTrigger>
+              <TabsTrigger value="treatments" className="gap-2 py-3 px-6"><History className="w-4 h-4" /> Tratamientos</TabsTrigger>
             </TabsList>
+
+            <TabsContent value="treatments">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {appointments.length > 0 ? (
+                  appointments.flatMap((a, idx) => {
+                    // Si hay array de servicios/tratamientos, lo usamos; si no, usamos el tratamiento principal
+                    const servicios = Array.isArray(a.services) && a.services.length > 0
+                      ? a.services
+                      : [{
+                          name: a.treatmentName || 'Consulta',
+                          cost: a.cost,
+                          observations: a.observations,
+                        }];
+                    return servicios.map((serv, sidx) => (
+                      <Card key={`${a.id}-servicio-${sidx}`} className="border-none shadow-sm hover:shadow-md transition-all">
+                        <CardHeader className="bg-primary/5 p-4 flex flex-row justify-between items-center">
+                          <div>
+                            <p className="text-[10px] uppercase font-bold text-muted-foreground">Tratamiento #{idx + 1}{servicios.length > 1 ? ` - Servicio ${sidx + 1}` : ''}</p>
+                            <p className="font-bold text-sm">{serv.name}</p>
+                          </div>
+                          <History className="w-5 h-5 text-primary opacity-50" />
+                        </CardHeader>
+                        <CardContent className="p-4">
+                          <div className="mb-2">
+                            <span className="block text-xs font-bold text-muted-foreground uppercase">Nombre</span>
+                            <span className="block text-base font-medium">{serv.name}</span>
+                          </div>
+                          <div className="mb-2">
+                            <span className="block text-xs font-bold text-muted-foreground uppercase">Médico</span>
+                            <span className="block text-base">Dr. {a.doctorName}</span>
+                          </div>
+                          <div className="mb-2">
+                            <span className="block text-xs font-bold text-muted-foreground uppercase">Fecha</span>
+                            <span className="block text-base">{a.date} - {a.time}</span>
+                          </div>
+                          <div className="mb-2">
+                            <span className="block text-xs font-bold text-muted-foreground uppercase">Estado</span>
+                            <Badge variant={a.status === 'Atendido' ? 'default' : 'secondary'}>{a.status}</Badge>
+                          </div>
+                          <div className="mb-2">
+                            <span className="block text-xs font-bold text-muted-foreground uppercase">Precio</span>
+                            <span className="block text-base font-bold text-emerald-600">S/. {serv.cost?.toFixed ? serv.cost.toFixed(2) : Number(serv.cost || 0).toFixed(2)}</span>
+                          </div>
+                          <div>
+                            <span className="block text-xs font-bold text-muted-foreground uppercase">Observaciones</span>
+                            <span className="block text-sm italic">{serv.observations || '-'}</span>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ));
+                  })
+                ) : (
+                  <div className="col-span-full py-12 text-center text-muted-foreground border-2 border-dashed rounded-xl">No hay tratamientos registrados</div>
+                )}
+              </div>
+            </TabsContent>
 
             <TabsContent value="overview">
                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

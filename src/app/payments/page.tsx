@@ -46,6 +46,11 @@ type ApiPayment = {
     status: string;
     cost?: string | number;
     treatment?: { id: string; name: string } | null;
+    appointment_treatments?: Array<{
+      treatment?: { id: string; name: string } | null;
+      price: string | number;
+      observations?: string | null;
+    }>;
   };
   payment_histories?: ApiPaymentHistory[];
 };
@@ -62,6 +67,11 @@ type ApiAppointment = {
     dni: string;
   };
   treatment?: { id: string; name: string } | null;
+  appointment_treatments?: Array<{
+    treatment?: { id: string; name: string } | null;
+    price: string | number;
+    observations?: string | null;
+  }>;
 };
 
 type ApiResponse<T> = {
@@ -108,6 +118,16 @@ async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
 
 function toNumber(v: string | number | undefined | null) {
   return Number(v || 0);
+}
+
+function resolveAppointmentTreatments(appointment?: ApiPayment['appointment']) {
+  const services = appointment?.appointment_treatments
+    ?.map((item) => item.treatment?.name || '')
+    .filter((name) => Boolean(name));
+
+  if (services && services.length > 0) return services;
+  const fallback = appointment?.treatment?.name;
+  return [fallback || 'Consulta'];
 }
 
 function PaymentsContent() {
@@ -179,6 +199,7 @@ function PaymentsContent() {
               status: appt.status,
               cost: appt.cost,
               treatment: appt.treatment,
+              appointment_treatments: appt.appointment_treatments,
             },
             payment_histories: [],
           };
@@ -269,7 +290,7 @@ function PaymentsContent() {
     () =>
       payments.filter((p) => {
         const patientName = p.patient?.full_name || '';
-        const treatmentName = p.appointment?.treatment?.name || 'Consulta';
+        const treatmentName = resolveAppointmentTreatments(p.appointment).join(' ');
         const patientDni = p.patient?.dni || '';
 
         return (
@@ -360,7 +381,8 @@ function PaymentsContent() {
                   const balance = toNumber(p.balance);
                   const patientName = p.patient?.full_name || 'Desconocido';
                   const patientDni = p.patient?.dni || '';
-                  const treatmentName = p.appointment?.treatment?.name || 'Consulta';
+                  const treatmentNames = resolveAppointmentTreatments(p.appointment);
+                  const treatmentLabel = treatmentNames.join(', ');
 
                   return (
                     <TableRow key={p.id}>
@@ -369,7 +391,7 @@ function PaymentsContent() {
                         <div className="text-[10px] text-muted-foreground">DNI: {patientDni}</div>
                       </TableCell>
                       <TableCell>
-                        <div className="font-medium text-[11px] uppercase truncate max-w-[150px]">{treatmentName}</div>
+                        <div className="font-medium text-[11px] uppercase truncate max-w-[150px]">{treatmentLabel}</div>
                         <div className="text-[10px] text-muted-foreground">{safeFormatDate(p.created_at)}</div>
                       </TableCell>
                       <TableCell className="text-sm">S/. {totalCost.toFixed(2)}</TableCell>
@@ -455,7 +477,7 @@ function PaymentsContent() {
                     Paciente: <b className="text-primary">{editingPayment.patient?.full_name || 'Desconocido'}</b>
                   </p>
                   <p className="text-xs">
-                    Procedimiento: <b>{editingPayment.appointment?.treatment?.name || 'Consulta'}</b>
+                    Procedimiento: <b>{resolveAppointmentTreatments(editingPayment.appointment).join(', ')}</b>
                   </p>
                   <p className="text-xs">
                     Saldo pendiente:{' '}

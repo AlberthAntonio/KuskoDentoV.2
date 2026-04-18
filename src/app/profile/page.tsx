@@ -226,7 +226,9 @@ function ProfileContent() {
           <TabsList className="bg-muted p-1 rounded-2xl h-auto w-full md:w-fit flex-wrap">
             <TabsTrigger value="security" className="py-2.5 px-6 gap-2 rounded-xl data-[state=active]:shadow-lg"><Lock className="w-4 h-4" /> Seguridad</TabsTrigger>
             <TabsTrigger value="appearance" className="py-2.5 px-6 gap-2 rounded-xl data-[state=active]:shadow-lg"><Palette className="w-4 h-4" /> Identidad de Marca</TabsTrigger>
-            <TabsTrigger value="subscription" className="py-2.5 px-6 gap-2 rounded-xl data-[state=active]:shadow-lg"><CreditCard className="w-4 h-4" /> Suscripción</TabsTrigger>
+            {isClinic && (
+              <TabsTrigger value="subscription" className="py-2.5 px-6 gap-2 rounded-xl data-[state=active]:shadow-lg"><CreditCard className="w-4 h-4" /> Suscripción</TabsTrigger>
+            )}
             {isAdmin && <TabsTrigger value="billing" className="py-2.5 px-6 gap-2 rounded-xl data-[state=active]:shadow-lg"><Wallet className="w-4 h-4" /> Medios de Pago</TabsTrigger>}
           </TabsList>
 
@@ -367,6 +369,7 @@ function ProfileContent() {
             </div>
           </TabsContent>
 
+          {isClinic && (
           <TabsContent value="subscription" className="animate-in fade-in duration-500">
             <Card className="border-none shadow-xl shadow-slate-200/50 dark:shadow-none bg-white dark:bg-slate-950 rounded-3xl">
               <CardHeader>
@@ -416,6 +419,7 @@ function ProfileContent() {
               </CardContent>
             </Card>
           </TabsContent>
+          )}
 
           {isAdmin && (
             <TabsContent value="billing" className="animate-in fade-in duration-500">

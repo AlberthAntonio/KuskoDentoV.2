@@ -36,6 +36,7 @@ model Clinic {
   odontograms         Odontogram[]
   consents            Consent[]
   inventory_items     InventoryItem[]
+  appointment_treatments AppointmentTreatment[]
 
   @@index([domain])
 }
@@ -77,7 +78,7 @@ model Patient {
   email                String?
   phone                String
   phone_secondary      String?
-  address              String
+  address              String?
   address_number       String?
   city                 String?
   state                String?
@@ -124,6 +125,7 @@ model Treatment {
   updated_at     DateTime      @updatedAt
   clinic         Clinic        @relation(fields: [clinic_id], references: [id], onDelete: Cascade)
   appointments   Appointment[]
+  appointment_treatments AppointmentTreatment[]
 
   @@unique([clinic_id, name])
   @@index([clinic_id])
@@ -149,6 +151,7 @@ model Appointment {
   patient          Patient      @relation(fields: [patient_id], references: [id], onDelete: Cascade)
   doctor           User         @relation("doctor", fields: [doctor_id], references: [id])
   treatment        Treatment?   @relation(fields: [treatment_id], references: [id])
+  appointment_treatments AppointmentTreatment[]
   payments         Payment[]
   radiographs      Radiograph[]
   odontograms      Odontogram[]
@@ -160,6 +163,25 @@ model Appointment {
   @@index([doctor_id])
   @@index([date])
   @@index([status])
+}
+
+model AppointmentTreatment {
+  id             String   @id @default(cuid())
+  clinic_id      String
+  appointment_id String
+  treatment_id   String
+  price          Decimal  @db.Decimal(10, 2)
+  observations   String?
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
+  clinic         Clinic   @relation(fields: [clinic_id], references: [id], onDelete: Cascade)
+  appointment    Appointment @relation(fields: [appointment_id], references: [id], onDelete: Cascade)
+  treatment      Treatment   @relation(fields: [treatment_id], references: [id], onDelete: Cascade)
+
+  @@unique([appointment_id, treatment_id])
+  @@index([clinic_id])
+  @@index([appointment_id])
+  @@index([treatment_id])
 }
 
 model Payment {

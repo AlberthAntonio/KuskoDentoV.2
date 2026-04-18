@@ -38,6 +38,7 @@ export async function POST(request: Request) {
     }
 
     const created = await appointmentService.create(clinicId, parsed.data);
+
     return apiOk(created, 201);
   } catch (error) {
     return apiErrorFromUnknown(error, 500, 'api/appointments#post');

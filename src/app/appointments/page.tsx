@@ -42,6 +42,11 @@ type ApiAppointment = {
   patient?: { id: string; full_name: string };
   doctor?: { id: string; full_name: string | null };
   treatment?: { id: string; name: string; price: string | number };
+  appointment_treatments?: {
+    treatment: { id: string; name: string; price: string | number } | null;
+    price: string | number;
+    observations?: string | null;
+  }[];
 };
 
 type ViewAppointment = {
@@ -123,6 +128,7 @@ function AppointmentsContent() {
     [currentUser?.id, currentUser?.fullName, currentUser?.full_name, currentUser?.email]
   );
 
+  // Estado inicial
   const [form, setForm] = useState({
     patientId: '',
     treatmentId: '',
@@ -133,6 +139,7 @@ function AppointmentsContent() {
     status: 'Asignado' as 'Asignado' | 'Atendido',
     cost: 0,
     patientSearch: '',
+    selectedTreatments: [] as { id: string; name: string; price: number }[],
   });
 
   useEffect(() => {
@@ -157,7 +164,15 @@ function AppointmentsContent() {
       setPatients(patientsData.items || []);
       setTreatments(treatmentsData.items || []);
 
-      const mapped: ViewAppointment[] = (appointmentsData.items || []).map((a) => ({
+      const mapped: ViewAppointment[] = (appointmentsData.items || []).map((a) => {
+        const treatmentNames = a.appointment_treatments
+          ?.map((item) => item.treatment?.name || '')
+          .filter((name) => Boolean(name));
+        const treatmentName = treatmentNames && treatmentNames.length > 0
+          ? treatmentNames.join(', ')
+          : a.treatment?.name || 'Tratamiento';
+
+        return {
         id: a.id,
         patientId: a.patient_id,
         doctorId: a.doctor_id,
@@ -166,11 +181,12 @@ function AppointmentsContent() {
         dateKey: toDateKey(a.date),
         time: a.time,
         patientName: a.patient?.full_name || 'Paciente',
-        treatmentName: a.treatment?.name || 'Tratamiento',
+        treatmentName,
         doctorName: a.doctor?.full_name || 'Doctor',
         cost: Number(a.cost) || 0,
         status: mapStatusToUi(a.status),
-      }));
+        };
+      });
 
       setRawAppointments(mapped);
     } catch (error) {
@@ -229,17 +245,22 @@ function AppointmentsContent() {
     }
 
     try {
+      // Registrar la cita
       await apiRequest('/api/appointments', {
         method: 'POST',
         body: JSON.stringify({
           patient_id: form.patientId,
           doctor_id: form.doctorId,
-          treatment_id: form.treatmentId || undefined,
+          treatment_id: form.selectedTreatments[0]?.id || undefined,
           date: form.date,
           time: form.time,
           cost: Math.max(0.01, form.cost),
           status: mapStatusToApi(form.status),
           observations: form.observations || undefined,
+          services: form.selectedTreatments.map((tr) => ({
+            treatment_id: tr.id,
+            price: tr.price,
+          })),
         }),
       });
 
@@ -255,6 +276,7 @@ function AppointmentsContent() {
         status: 'Asignado',
         cost: 0,
         patientSearch: '',
+        selectedTreatments: [],
       });
       load();
     } catch (error) {
@@ -384,19 +406,74 @@ function AppointmentsContent() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Tratamiento</Label>
-                    <Select onValueChange={handleTreatmentChange}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccione..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {treatments.map((t) => (
-                          <SelectItem key={t.id} value={t.id}>
-                            {t.name}
-                          </SelectItem>
+                    <Label>Tratamientos</Label>
+                    <div className="flex gap-2">  
+                      <Select
+                        onValueChange={(tid) => setForm({ ...form, treatmentId: tid })}
+                        value={form.treatmentId || undefined}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Seleccione..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {treatments
+                            .filter((t) => !form.selectedTreatments.some((st) => st.id === t.id))
+                            .map((t) => (
+                              <SelectItem key={t.id} value={t.id}>
+                                {t.name}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="gap-1 text-primary border-primary/40 hover:bg-primary/10 transition"
+                        disabled={!form.treatmentId}
+                        onClick={() => {
+                          const t = treatments.find((x) => x.id === form.treatmentId);
+                          if (!t) return;
+                          if (form.selectedTreatments.some((st) => st.id === t.id)) return;
+                          const updated = [...form.selectedTreatments, { id: t.id, name: t.name, price: Number(t.price) }];
+                          setForm({
+                            ...form,
+                            selectedTreatments: updated,
+                            cost: updated.reduce((sum, tr) => sum + Number(tr.price), 0),
+                            treatmentId: '',
+                          });
+                        }}
+                      >
+                        <Plus className="w-4 h-4" />
+                        Añadir
+                      </Button>
+                    </div>
+                    {form.selectedTreatments.length > 0 && (
+                      <div className="mt-2 space-y-1">
+                        {form.selectedTreatments.map((tr) => (
+                          <div key={tr.id} className="flex items-center gap-2 text-xs bg-muted/50 rounded px-2 py-1">
+                            <span>{tr.name}</span>
+                            <span className="font-mono">S/. {Number(tr.price).toFixed(2)}</span>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              className="text-destructive px-1"
+                              onClick={() => {
+                                const updated = form.selectedTreatments.filter((x) => x.id !== tr.id);
+                                setForm({
+                                  ...form,
+                                  selectedTreatments: updated,
+                                  cost: updated.reduce((sum, t) => sum + Number(t.price), 0),
+                                });
+                              }}
+                            >
+                              Quitar
+                            </Button>
+                          </div>
                         ))}
-                      </SelectContent>
-                    </Select>
+                      </div>
+                    )}
                   </div>
 
                   <div className="space-y-2">
@@ -417,12 +494,22 @@ function AppointmentsContent() {
 
                   <div className="space-y-2">
                     <Label>Fecha</Label>
-                    <Input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
+                    <Input
+                      type="date"
+                      value={form.date}
+                      onChange={(e) => setForm({ ...form, date: e.target.value })}
+                      required
+                    />
                   </div>
 
                   <div className="space-y-2">
                     <Label>Hora</Label>
-                    <Input type="time" value={form.time} onChange={(e) => setForm({ ...form, time: e.target.value })} required />
+                    <Input
+                      type="time"
+                      value={form.time}
+                      onChange={(e) => setForm({ ...form, time: e.target.value })}
+                      required
+                    />
                   </div>
 
                   <div className="col-span-2 space-y-2">
