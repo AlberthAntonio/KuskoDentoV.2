@@ -10,8 +10,7 @@ async function main() {
     create: {
       name: 'Demo Clinic',
       domain: 'demo.local',
-      subscription_status: 'active',
-      subscription_tier: 'basic',
+
     },
   });
 
@@ -23,7 +22,7 @@ async function main() {
       clinic_id: clinic.id,
       password_hash: hash,
       status: 'active',
-      role: 'clinic_owner',
+      role: 'admin',
       full_name: 'Demo Owner',
     },
     create: {
@@ -31,7 +30,7 @@ async function main() {
       email: 'demo@clinic.com',
       password_hash: hash,
       status: 'active',
-      role: 'clinic_owner',
+      role: 'admin',
       full_name: 'Demo Owner',
     },
   });

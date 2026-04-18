@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { AuthProvider, useAuth } from '@/hooks/use-auth';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
+import { fetchDniData } from '@/app/api/reniec/api';
 import { Input } from '@/components/ui/input';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table';
 import { Card } from '@/components/ui/card';
@@ -14,6 +15,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
+import { useApi } from '@/hooks/use-api';
+import type { AdminUser } from '@/types/admin';
+
 
 type ApiPatient = {
   id: string;
@@ -62,6 +66,9 @@ async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
 function PatientsContent() {
   const { toast } = useToast();
   const { user } = useAuth();
+  const { data: staffPayload } = useApi<{ items: AdminUser[] }>('/api/admin/users', {
+    autoFetch: Boolean(user),
+  });
   const [patients, setPatients] = useState<ApiPatient[]>([]);
   const [search, setSearch] = useState('');
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
@@ -81,15 +88,66 @@ function PatientsContent() {
     attendedBy: '',
   });
 
-  const userOptions = useMemo(
-    () => [
-      {
-        id: user?.id || 'self',
-        label: user?.fullName || user?.full_name || user?.email || 'Odontologo',
-      },
-    ],
-    [user?.id, user?.fullName, user?.full_name, user?.email]
-  );
+  const [isValidatingDni, setIsValidatingDni] = useState(false);
+
+  const handleValidateDni = async () => {
+    if (newPatient.dni.length !== 8) {
+      toast({
+        variant: 'destructive',
+        title: 'DNI inválido',
+        description: 'El DNI debe tener 8 dígitos.',
+      });
+      return;
+    }
+    setIsValidatingDni(true);
+    try {
+      const data = await fetchDniData(newPatient.dni);
+      // Ajusta los campos según la respuesta real de la API
+      const nombres = data?.nombres || data?.nombre || '';
+      const apellidoPaterno = data?.apellido_paterno || '';
+      const apellidoMaterno = data?.apellido_materno || '';
+      setNewPatient((prev) => ({
+        ...prev,
+        names: nombres,
+        lastNames: `${apellidoPaterno} ${apellidoMaterno}`.trim(),
+      }));
+      toast({
+        title: 'DNI validado',
+        description: 'Datos recuperados correctamente.',
+      });
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'No se pudo validar',
+        description: error instanceof Error ? error.message : 'Error inesperado',
+      });
+    } finally {
+      setIsValidatingDni(false);
+    }
+  };
+
+  const staffUsers = staffPayload?.items ?? [];
+
+  const userOptions = useMemo(() => {
+    const options: { id: string; label: string }[] = [];
+    const pushOption = (id?: string, label?: string | null) => {
+      if (!id || options.some((item) => item.id === id)) return;
+      const safeLabel = (label || '').trim();
+      options.push({ id, label: safeLabel || 'Odontologo' });
+    };
+
+    staffUsers
+      .filter((staff) => staff.status !== 'inactive')
+      .forEach((staff) => {
+        pushOption(staff.id, staff.fullName || staff.username || staff.dni);
+      });
+
+    if (user) {
+      pushOption(user.id, user.fullName || user.full_name || user.email);
+    }
+
+    return options;
+  }, [staffUsers, user]);
 
   useEffect(() => {
     if (user) {
@@ -225,12 +283,23 @@ function PatientsContent() {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="dni">DNI / Pasaporte</Label>
-                      <Input
-                        id="dni"
-                        value={newPatient.dni}
-                        onChange={(e) => setNewPatient({ ...newPatient, dni: e.target.value.replace(/\D/g, '').slice(0, 12) })}
-                        placeholder="00000000"
-                      />
+                      <div className="flex gap-2">
+                        <Input
+                          id="dni"
+                          value={newPatient.dni}
+                          onChange={(e) => setNewPatient({ ...newPatient, dni: e.target.value.replace(/\D/g, '').slice(0, 12) })}
+                          placeholder="00000000"
+                        />
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          className="font-black"
+                          disabled={isValidatingDni || newPatient.dni.length !== 8}
+                          onClick={handleValidateDni}
+                        >
+                          {isValidatingDni ? 'Validando...' : 'VALIDAR'}
+                        </Button>
+                      </div>
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="phone">Celular</Label>
@@ -258,7 +327,7 @@ function PatientsContent() {
                     </div>
                     <div className="space-y-2 col-span-2">
                       <Label htmlFor="address">Direccion</Label>
-                      <Input id="address" value={newPatient.address} onChange={(e) => setNewPatient({ ...newPatient, address: e.target.value })} required />
+                      <Input id="address" value={newPatient.address} onChange={(e) => setNewPatient({ ...newPatient, address: e.target.value })} />
                     </div>
                   </div>
                 </div>

@@ -152,6 +152,12 @@ export interface Appointment {
   cost: number;
   clinicId?: string;
   observations?: string;
+  treatmentName?: string;
+  services?: Array<{
+    name: string;
+    cost: number;
+    observations?: string | null;
+  }>;
 }
 
 export interface Payment {

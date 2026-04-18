@@ -18,6 +18,13 @@ const optionalCuid = z.preprocess((value) => {
   return trimmed.length > 0 ? trimmed : undefined;
 }, z.string().cuid().optional());
 
+const optionalMinLengthString = (min: number) =>
+  z.preprocess((value) => {
+    if (typeof value !== 'string') return value;
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
+  }, z.string().min(min).optional());
+
 export const LoginSchema = z.object({
   identifier: optionalTrimmedString,
   id: optionalTrimmedString,
@@ -34,7 +41,7 @@ export const CreatePatientSchema = z.object({
   dni: z.string().min(5),
   full_name: z.string().min(2),
   phone: z.string().min(6),
-  address: z.string().min(3),
+  address: optionalMinLengthString(3),
   email: optionalEmail,
   first_name: z.string().optional(),
   last_name: z.string().optional(),
@@ -55,6 +62,14 @@ export const CreateAppointmentSchema = z.object({
   time: z.string().min(4),
   cost: z.number().positive(),
   status: z.string().optional(),
+  observations: z.string().optional(),
+  services: z.array(
+    z.object({
+      treatment_id: z.string().cuid(),
+      price: z.number().positive(),
+      observations: z.string().optional(),
+    })
+  ).optional(),
 });
 
 export const CreatePaymentSchema = z.object({

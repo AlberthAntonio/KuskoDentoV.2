@@ -137,6 +137,24 @@ CREATE TABLE `Appointment` (
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
+CREATE TABLE `AppointmentTreatment` (
+    `id` VARCHAR(191) NOT NULL,
+    `clinic_id` VARCHAR(191) NOT NULL,
+    `appointment_id` VARCHAR(191) NOT NULL,
+    `treatment_id` VARCHAR(191) NOT NULL,
+    `price` DECIMAL(10, 2) NOT NULL,
+    `observations` VARCHAR(191) NULL,
+    `created_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `updated_at` DATETIME(3) NOT NULL,
+
+    INDEX `AppointmentTreatment_clinic_id_idx`(`clinic_id`),
+    INDEX `AppointmentTreatment_appointment_id_idx`(`appointment_id`),
+    INDEX `AppointmentTreatment_treatment_id_idx`(`treatment_id`),
+    UNIQUE INDEX `AppointmentTreatment_appointment_id_treatment_id_key`(`appointment_id`, `treatment_id`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
 CREATE TABLE `Payment` (
     `id` VARCHAR(191) NOT NULL,
     `clinic_id` VARCHAR(191) NOT NULL,
@@ -279,6 +297,15 @@ ALTER TABLE `Appointment` ADD CONSTRAINT `Appointment_doctor_id_fkey` FOREIGN KE
 
 -- AddForeignKey
 ALTER TABLE `Appointment` ADD CONSTRAINT `Appointment_treatment_id_fkey` FOREIGN KEY (`treatment_id`) REFERENCES `Treatment`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `AppointmentTreatment` ADD CONSTRAINT `AppointmentTreatment_clinic_id_fkey` FOREIGN KEY (`clinic_id`) REFERENCES `Clinic`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `AppointmentTreatment` ADD CONSTRAINT `AppointmentTreatment_appointment_id_fkey` FOREIGN KEY (`appointment_id`) REFERENCES `Appointment`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `AppointmentTreatment` ADD CONSTRAINT `AppointmentTreatment_treatment_id_fkey` FOREIGN KEY (`treatment_id`) REFERENCES `Treatment`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE `Payment` ADD CONSTRAINT `Payment_clinic_id_fkey` FOREIGN KEY (`clinic_id`) REFERENCES `Clinic`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;

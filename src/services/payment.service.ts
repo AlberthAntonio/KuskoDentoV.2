@@ -18,6 +18,13 @@ export const paymentService = {
             time: true,
             status: true,
             treatment: { select: { id: true, name: true } },
+            appointment_treatments: {
+              select: {
+                treatment: { select: { id: true, name: true } },
+                price: true,
+                observations: true,
+              },
+            },
           },
         },
         payment_histories: {
@@ -98,6 +105,13 @@ export const paymentService = {
               time: true,
               status: true,
               treatment: { select: { id: true, name: true } },
+              appointment_treatments: {
+                select: {
+                  treatment: { select: { id: true, name: true } },
+                  price: true,
+                  observations: true,
+                },
+              },
             },
           },
           payment_histories: { orderBy: { payment_date: 'asc' } },
@@ -162,6 +176,13 @@ export const paymentService = {
               time: true,
               status: true,
               treatment: { select: { id: true, name: true } },
+              appointment_treatments: {
+                select: {
+                  treatment: { select: { id: true, name: true } },
+                  price: true,
+                  observations: true,
+                },
+              },
             },
           },
           payment_histories: { orderBy: { payment_date: 'asc' } },
@@ -182,6 +203,13 @@ export const paymentService = {
             time: true,
             status: true,
             treatment: { select: { id: true, name: true } },
+            appointment_treatments: {
+              select: {
+                treatment: { select: { id: true, name: true } },
+                price: true,
+                observations: true,
+              },
+            },
           },
         },
         payment_histories: { orderBy: { payment_date: 'asc' } },
