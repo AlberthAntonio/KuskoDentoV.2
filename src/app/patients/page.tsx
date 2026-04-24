@@ -16,6 +16,7 @@ import { Textarea } from '@/components/ui/textarea';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import { useApi } from '@/hooks/use-api';
+import { useFocus } from '@/hooks/use-focus';
 import type { AdminUser } from '@/types/admin';
 
 
@@ -66,6 +67,7 @@ async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
 function PatientsContent() {
   const { toast } = useToast();
   const { user } = useAuth();
+  const { focusMode, activePatientId } = useFocus();
   const { data: staffPayload } = useApi<{ items: AdminUser[] }>('/api/admin/users', {
     autoFetch: Boolean(user),
   });
@@ -86,6 +88,11 @@ function PatientsContent() {
     consultationReason: '',
     medicalObservations: '',
     attendedBy: '',
+    clinical_alerts: '',
+    under_treatment: false,
+    prone_to_bleeding: false,
+    allergic_to_meds: false,
+    allergies_detail: '',
   });
 
   const [isValidatingDni, setIsValidatingDni] = useState(false);
@@ -190,6 +197,11 @@ function PatientsContent() {
           medical_observations: [newPatient.consultationReason, newPatient.medicalObservations]
             .filter(Boolean)
             .join(' | ') || undefined,
+          clinical_alerts: newPatient.clinical_alerts || undefined,
+          under_treatment: newPatient.under_treatment,
+          prone_to_bleeding: newPatient.prone_to_bleeding,
+          allergic_to_meds: newPatient.allergic_to_meds,
+          allergies_detail: newPatient.allergies_detail || undefined,
         }),
       });
 
@@ -217,6 +229,11 @@ function PatientsContent() {
       consultationReason: '',
       medicalObservations: '',
       attendedBy: '',
+      clinical_alerts: '',
+      under_treatment: false,
+      prone_to_bleeding: false,
+      allergic_to_meds: false,
+      allergies_detail: '',
     });
   };
 
@@ -253,9 +270,12 @@ function PatientsContent() {
     }
   };
 
-  const filteredPatients = patients.filter((p) =>
-    p.full_name.toLowerCase().includes(search.toLowerCase()) || p.dni.includes(search)
-  );
+  const filteredPatients = patients.filter((p) => {
+    if (focusMode && activePatientId) {
+      return p.id === activePatientId;
+    }
+    return p.full_name.toLowerCase().includes(search.toLowerCase()) || p.dni.includes(search);
+  });
 
   return (
     <AppLayout>
@@ -335,6 +355,54 @@ function PatientsContent() {
                 <div className="space-y-4">
                   <h3 className="font-bold text-lg border-b pb-2 text-primary">Historia Medica</h3>
                   <div className="space-y-3">
+                    <div className="space-y-2">
+                      <Label className="font-bold text-xs uppercase tracking-widest text-muted-foreground">Alertas de Historia Clinica</Label>
+                      <Input value={newPatient.clinical_alerts} onChange={(e) => setNewPatient({ ...newPatient, clinical_alerts: e.target.value })} />
+                    </div>
+                    <div className="grid grid-cols-3 gap-3 mt-2">
+                      <div className="space-y-2">
+                        <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground">T. Médico</Label>
+                        <Select value={newPatient.under_treatment ? 'si' : 'no'} onValueChange={(v) => setNewPatient({ ...newPatient, under_treatment: v === 'si' })}>
+                          <SelectTrigger className="h-11 rounded-xl">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="no">NO</SelectItem>
+                            <SelectItem value="si">SI</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Hemorragias</Label>
+                        <Select value={newPatient.prone_to_bleeding ? 'si' : 'no'} onValueChange={(v) => setNewPatient({ ...newPatient, prone_to_bleeding: v === 'si' })}>
+                          <SelectTrigger className="h-11 rounded-xl">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="no">NO</SelectItem>
+                            <SelectItem value="si">SI</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Alergias</Label>
+                        <Select value={newPatient.allergic_to_meds ? 'si' : 'no'} onValueChange={(v) => setNewPatient({ ...newPatient, allergic_to_meds: v === 'si' })}>
+                          <SelectTrigger className="h-11 rounded-xl">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="no">NO</SelectItem>
+                            <SelectItem value="si">SI</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    {newPatient.allergic_to_meds && (
+                      <div className="space-y-2 mt-3">
+                        <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Detalle alergias</Label>
+                        <Input value={newPatient.allergies_detail} onChange={(e) => setNewPatient({ ...newPatient, allergies_detail: e.target.value })} />
+                      </div>
+                    )}
                     <div className="space-y-2">
                       <Label className="font-bold text-xs uppercase tracking-widest text-muted-foreground">Motivo de consulta</Label>
                       <Input value={newPatient.consultationReason} onChange={(e) => setNewPatient({ ...newPatient, consultationReason: e.target.value })} />

@@ -18,6 +18,7 @@ type SaveUserInput = {
   username?: string;
   password?: string;
   fullName?: string;
+  clinicName?: string;
   dni?: string;
   address?: string;
   colegiatura?: string;
@@ -135,6 +136,7 @@ function mapClinicToAdminUser(clinic: {
   created_by: string | null;
   users: Array<{
     username: string | null;
+    full_name: string | null;
     dni: string | null;
     status: string;
     address: string | null;
@@ -150,6 +152,7 @@ function mapClinicToAdminUser(clinic: {
     role: 'clinic',
     username: owner?.username ?? undefined,
     fullName: clinic.name,
+    ownerName: owner?.full_name ?? undefined,
     dni: owner?.dni ?? undefined,
     address: clinic.address ?? owner?.address ?? undefined,
     colegiatura: owner?.colegiatura ?? undefined,
@@ -238,6 +241,7 @@ export const adminService = {
             orderBy: { created_at: 'asc' },
             select: {
               username: true,
+              full_name: true,
               dni: true,
               status: true,
               address: true,
@@ -256,7 +260,6 @@ export const adminService = {
       const staff = await prisma.user.findMany({
         where: {
           clinic_id: actor.clinicId,
-          NOT: { role: 'clinic' },
         },
         orderBy: { created_at: 'desc' },
         select: {
@@ -282,14 +285,15 @@ export const adminService = {
   async createUser(actor: Actor, input: SaveUserInput): Promise<AdminUser> {
     if (isAdmin(actor)) {
       const fullName = clean(input.fullName);
+      const clinicName = clean(input.clinicName) ?? fullName;
       const username = clean(input.username);
       const password = clean(input.password);
 
-      if (!fullName) throw new Error('El nombre del consultorio es obligatorio');
+      if (!clinicName) throw new Error('El nombre de la clinica es obligatorio');
       if (!username) throw new Error('El usuario del consultorio es obligatorio');
       if (!password || password.length < 8) throw new Error('La clave debe tener al menos 8 caracteres');
 
-      const domain = await uniqueDomain(username || fullName);
+        const domain = await uniqueDomain(username || clinicName);
       const createdBy = actor.username ?? actor.email ?? actor.id;
       const contractStartDate = parseDate(input.contractStartDate);
       const nextPaymentDate = parseDate(input.nextPaymentDate) ?? (contractStartDate ? addMonthsSafe(contractStartDate, 1) : undefined);
@@ -299,7 +303,7 @@ export const adminService = {
       const created = await prisma.$transaction(async (tx) => {
         const clinic = await tx.clinic.create({
           data: {
-            name: fullName,
+              name: clinicName,
             domain,
             address: clean(input.address),
             logo_url: clean(input.photo),
@@ -316,6 +320,7 @@ export const adminService = {
               orderBy: { created_at: 'asc' },
               select: {
                 username: true,
+                full_name: true,
                 dni: true,
                 status: true,
                 address: true,
@@ -332,7 +337,7 @@ export const adminService = {
             username,
             password_hash: passwordHash,
             role: 'clinic',
-            full_name: fullName,
+              full_name: clean(input.fullName),
             dni: clean(input.dni),
             address: clean(input.address),
             photo_url: normalizeUserPhotoUrl(input.photo),
@@ -349,6 +354,7 @@ export const adminService = {
               orderBy: { created_at: 'asc' },
               select: {
                 username: true,
+                full_name: true,
                 dni: true,
                 status: true,
                 address: true,
@@ -414,6 +420,7 @@ export const adminService = {
             orderBy: { created_at: 'asc' },
             select: {
               username: true,
+              full_name: true,
               dni: true,
               status: true,
               address: true,
@@ -436,7 +443,7 @@ export const adminService = {
       await prisma.clinic.update({
         where: { id: clinic.id },
         data: {
-          name: clean(input.fullName) ?? clinic.name,
+            name: clean(input.clinicName) ?? clean(input.fullName) ?? clinic.name,
           address: clean(input.address) ?? clinic.address,
           logo_url: clean(input.photo) ?? clinic.logo_url,
           subscription_fee: resolvedSubscriptionFee,
@@ -464,7 +471,7 @@ export const adminService = {
           data: {
             username: clean(input.username),
             password_hash: passwordHash,
-            full_name: clean(input.fullName),
+              full_name: clean(input.fullName),
             dni: clean(input.dni),
             address: clean(input.address),
             photo_url: normalizeUserPhotoUrl(input.photo),
@@ -480,7 +487,7 @@ export const adminService = {
             username: clean(input.username),
             password_hash: fallbackPasswordHash,
             role: 'clinic',
-            full_name: clean(input.fullName) ?? clinic.name,
+              full_name: clean(input.fullName) ?? clinic.name,
             dni: clean(input.dni),
             address: clean(input.address),
             photo_url: normalizeUserPhotoUrl(input.photo),
@@ -498,6 +505,7 @@ export const adminService = {
             orderBy: { created_at: 'asc' },
             select: {
               username: true,
+              full_name: true,
               dni: true,
               status: true,
               address: true,

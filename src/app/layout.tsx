@@ -5,6 +5,7 @@ import { PT_Sans } from 'next/font/google';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { AuthProvider } from '@/hooks/use-auth';
+import { FocusProvider } from '@/hooks/use-focus';
 
 const ptSans = PT_Sans({
   subsets: ['latin'],
@@ -14,7 +15,7 @@ const ptSans = PT_Sans({
 });
 
 export const metadata: Metadata = {
-  title: 'KuskoDento - Gestión Odontológica',
+  title: 'CuscoDento - Gestión Odontológica',
   description: 'Sistema de gestión odontológica local para Cusco, Perú',
 };
 
@@ -40,8 +41,10 @@ export default async function RootLayout({
           {`window.__CSP_NONCE__ = '${nonce || ''}';`}
         </Script>
         <AuthProvider>
-          {children}
-          <Toaster />
+          <FocusProvider>
+            {children}
+            <Toaster />
+          </FocusProvider>
         </AuthProvider>
       </body>
     </html>

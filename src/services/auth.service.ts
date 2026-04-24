@@ -72,7 +72,9 @@ export const authService = {
       user: {
         id: user.id,
         email: user.email,
+        username: user.username,
         full_name: user.full_name,
+        dni: user.dni,
         role: user.role,
         clinic_id: user.clinic_id,
       },
@@ -111,7 +113,9 @@ export const authService = {
       user: {
         id: user.id,
         email: user.email,
+        username: user.username,
         full_name: user.full_name,
+        dni: user.dni,
         role: user.role,
         clinic_id: user.clinic_id,
       },

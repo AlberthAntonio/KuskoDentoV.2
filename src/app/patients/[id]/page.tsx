@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, use } from 'react';
+import { useState, useEffect, use, useMemo } from 'react';
 import { AuthProvider } from '@/hooks/use-auth';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { db, Patient, Radiograph, Consent, Appointment, Payment, Odontogram } from '@/lib/legacy-data';
@@ -435,6 +435,59 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
     }
   };
 
+  const groupedTreatments = useMemo(() => {
+    const grouped = new Map<
+      string,
+      {
+        name: string;
+        total: number;
+        sessions: Array<{
+          id: string;
+          date: string;
+          time: string;
+          doctorName: string;
+          status: Appointment['status'];
+          cost: number;
+          observations?: string;
+        }>;
+      }
+    >();
+
+    appointments.forEach((appointment) => {
+      const services = Array.isArray(appointment.services) && appointment.services.length > 0
+        ? appointment.services
+        : [{
+            name: appointment.treatmentName || 'Consulta',
+            cost: appointment.cost,
+            observations: appointment.observations,
+          }];
+
+      services.forEach((service) => {
+        const rawName = String(service.name || 'Consulta').trim() || 'Consulta';
+        const key = rawName.toLowerCase();
+        const entry = grouped.get(key) || {
+          name: rawName,
+          total: 0,
+          sessions: [],
+        };
+
+        entry.sessions.push({
+          id: appointment.id,
+          date: appointment.date,
+          time: appointment.time,
+          doctorName: appointment.doctorName,
+          status: appointment.status,
+          cost: Number(service.cost || 0),
+          observations: service.observations ?? undefined,
+        });
+        entry.total += Number(service.cost || 0);
+        grouped.set(key, entry);
+      });
+    });
+
+    return Array.from(grouped.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [appointments]);
+
   if (!patient) return null;
 
   return (
@@ -477,54 +530,43 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
 
             <TabsContent value="treatments">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {appointments.length > 0 ? (
-                  appointments.flatMap((a, idx) => {
-                    // Si hay array de servicios/tratamientos, lo usamos; si no, usamos el tratamiento principal
-                    const servicios = Array.isArray(a.services) && a.services.length > 0
-                      ? a.services
-                      : [{
-                          name: a.treatmentName || 'Consulta',
-                          cost: a.cost,
-                          observations: a.observations,
-                        }];
-                    return servicios.map((serv, sidx) => (
-                      <Card key={`${a.id}-servicio-${sidx}`} className="border-none shadow-sm hover:shadow-md transition-all">
-                        <CardHeader className="bg-primary/5 p-4 flex flex-row justify-between items-center">
-                          <div>
-                            <p className="text-[10px] uppercase font-bold text-muted-foreground">Tratamiento #{idx + 1}{servicios.length > 1 ? ` - Servicio ${sidx + 1}` : ''}</p>
-                            <p className="font-bold text-sm">{serv.name}</p>
+                {groupedTreatments.length > 0 ? (
+                  groupedTreatments.map((group, idx) => (
+                    <Card key={group.name} className="border-none shadow-sm hover:shadow-md transition-all">
+                      <CardHeader className="bg-primary/5 p-4 flex flex-row justify-between items-center">
+                        <div>
+                          <p className="text-[10px] uppercase font-bold text-muted-foreground">Tratamiento #{idx + 1}</p>
+                          <p className="font-bold text-sm">{group.name}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-[10px] uppercase text-muted-foreground">Sesiones</p>
+                          <p className="text-sm font-bold">{group.sessions.length}</p>
+                          <p className="text-[10px] uppercase text-muted-foreground mt-1">Total</p>
+                          <p className="text-sm font-bold text-emerald-600">S/. {group.total.toFixed(2)}</p>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="p-4 space-y-2">
+                        {group.sessions.map((session, sidx) => (
+                          <div key={`${group.name}-${session.id}-${sidx}`} className="rounded-lg border bg-slate-50/50 p-3">
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <p className="text-[10px] uppercase font-bold text-muted-foreground">Cita {sidx + 1}</p>
+                                <p className="text-sm font-medium">{session.date} - {session.time}</p>
+                                <p className="text-[10px] text-muted-foreground">Dr. {session.doctorName}</p>
+                              </div>
+                              <div className="text-right">
+                                <Badge variant={session.status === 'Atendido' ? 'default' : 'secondary'}>{session.status}</Badge>
+                                <p className="mt-2 text-sm font-bold text-emerald-600">S/. {session.cost.toFixed(2)}</p>
+                              </div>
+                            </div>
+                            {session.observations ? (
+                              <p className="mt-2 text-xs text-muted-foreground italic">{session.observations}</p>
+                            ) : null}
                           </div>
-                          <History className="w-5 h-5 text-primary opacity-50" />
-                        </CardHeader>
-                        <CardContent className="p-4">
-                          <div className="mb-2">
-                            <span className="block text-xs font-bold text-muted-foreground uppercase">Nombre</span>
-                            <span className="block text-base font-medium">{serv.name}</span>
-                          </div>
-                          <div className="mb-2">
-                            <span className="block text-xs font-bold text-muted-foreground uppercase">Médico</span>
-                            <span className="block text-base">Dr. {a.doctorName}</span>
-                          </div>
-                          <div className="mb-2">
-                            <span className="block text-xs font-bold text-muted-foreground uppercase">Fecha</span>
-                            <span className="block text-base">{a.date} - {a.time}</span>
-                          </div>
-                          <div className="mb-2">
-                            <span className="block text-xs font-bold text-muted-foreground uppercase">Estado</span>
-                            <Badge variant={a.status === 'Atendido' ? 'default' : 'secondary'}>{a.status}</Badge>
-                          </div>
-                          <div className="mb-2">
-                            <span className="block text-xs font-bold text-muted-foreground uppercase">Precio</span>
-                            <span className="block text-base font-bold text-emerald-600">S/. {serv.cost?.toFixed ? serv.cost.toFixed(2) : Number(serv.cost || 0).toFixed(2)}</span>
-                          </div>
-                          <div>
-                            <span className="block text-xs font-bold text-muted-foreground uppercase">Observaciones</span>
-                            <span className="block text-sm italic">{serv.observations || '-'}</span>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ));
-                  })
+                        ))}
+                      </CardContent>
+                    </Card>
+                  ))
                 ) : (
                   <div className="col-span-full py-12 text-center text-muted-foreground border-2 border-dashed rounded-xl">No hay tratamientos registrados</div>
                 )}

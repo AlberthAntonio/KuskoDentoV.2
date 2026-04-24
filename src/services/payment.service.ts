@@ -87,13 +87,6 @@ export const paymentService = {
         },
       });
 
-      if (balance.eq(0) && appointment.status !== 'completed') {
-        await tx.appointment.update({
-          where: { id: appointment.id },
-          data: { status: 'completed' },
-        });
-      }
-
       return tx.payment.findUnique({
         where: { id: payment.id },
         include: {
@@ -157,13 +150,6 @@ export const paymentService = {
           payment_method: data.payment_method,
         },
       });
-
-      if (updated.balance.eq(0) && payment.appointment.status !== 'completed') {
-        await tx.appointment.update({
-          where: { id: payment.appointment_id },
-          data: { status: 'completed' },
-        });
-      }
 
       return tx.payment.findUnique({
         where: { id: payment.id },

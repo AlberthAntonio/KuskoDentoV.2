@@ -1,15 +1,13 @@
-
 "use client";
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { SidebarProvider, Sidebar, SidebarContent, SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarTrigger, SidebarInset } from '@/components/ui/sidebar';
-import { Users, UserSquare2, Stethoscope, Landmark, Activity, Calendar, Database, LogOut, LayoutDashboard, ShieldCheck, BarChart3, CreditCard, AlertTriangle, QrCode, Building2, ShieldAlert, Banknote, User as UserIcon, X, MessageCircle, Boxes, Wallet, Timer, AlertCircle, Sun, Moon, Laptop, Sparkles } from 'lucide-react';
+import { Users, UserSquare2, Stethoscope, Landmark, Activity, Calendar, LayoutDashboard, ShieldCheck, BarChart3, CreditCard, AlertTriangle, QrCode, Building2, ShieldAlert, Banknote, User as UserIcon, MessageCircle, Boxes, Timer, AlertCircle, Sun, Moon, Sparkles } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
-import { format, parseISO, differenceInCalendarDays } from 'date-fns';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { parseISO, differenceInCalendarDays } from 'date-fns';
+import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 
@@ -34,7 +32,9 @@ function hexToHsl(hex: string) {
   }
   r /= 255; g /= 255; b /= 255;
   const max = Math.max(r, g, b), min = Math.min(r, g, b);
-  let h = 0, s = 0, l = (max + min) / 2;
+  let h = 0;
+  let s = 0;
+  const l = (max + min) / 2;
   if (max !== min) {
     const d = max - min;
     s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
@@ -68,15 +68,13 @@ function getReminderIntervalLabel(graceDay: number): string {
   return '5 minutos';
 }
 
-export function AppLayout({ children, isPayModalOpen: isPayModalOpenProp, setIsPayModalOpen: setIsPayModalOpenProp }: { children: React.ReactNode, isPayModalOpen?: boolean, setIsPayModalOpen?: (isOpen: boolean) => void }) {
+export function AppLayout({ children, setIsPayModalOpen: setIsPayModalOpenProp }: { children: React.ReactNode, setIsPayModalOpen?: (isOpen: boolean) => void }) {
   const { user, logout, updateUser } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
   
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
-  const [isPayModalOpenInternal, setIsPayModalOpenInternal] = useState(false);
-  const isPayModalOpen = isPayModalOpenProp ?? isPayModalOpenInternal;
-  const setIsPayModalOpen = setIsPayModalOpenProp ?? setIsPayModalOpenInternal;
+  const setIsPayModalOpen = setIsPayModalOpenProp ?? (() => {});
   const [isMoraReminderOpen, setIsMoraReminderOpen] = useState(false);
   const [moraCountdown, setMoraCountdown] = useState(5);
   const overdueDays = user?.nextPaymentDate
@@ -249,16 +247,24 @@ export function AppLayout({ children, isPayModalOpen: isPayModalOpenProp, setIsP
         <Sidebar variant="inset" className="border-none shadow-2xl shadow-slate-200/50 dark:shadow-none">
           <SidebarHeader className="p-8 pb-4">
             {user.photo ? (
-              <div className="h-16 w-full flex items-center justify-start overflow-hidden px-2 mb-2">
-                <img src={user.photo} className="max-h-full max-w-full object-contain" alt="Logo de la Clínica" />
-              </div>
+              isClinic ? (
+                <div className="h-20 w-full flex items-center justify-start px-2 mb-2">
+                  <div className="h- w- rounded-full overflow-hidden border border-white/60 shadow-md">
+                    <img src={user.photo} className="h-full w-full object-cover" alt="Logo de la Clínica" />
+                  </div>
+                </div>
+              ) : (
+                <div className="h-16 w-full flex items-center justify-start overflow-hidden px-2 mb-2">
+                  <img src={user.photo} className="max-h-full max-w-full object-contain" alt="Logo de la Clínica" />
+                </div>
+              )
             ) : (
               <div className="flex items-center gap-4 px-2 mb-4 group">
                 <div className="w-12 h-12 bg-primary rounded-2xl flex items-center justify-center text-white shadow-lg group-hover:scale-110 transition-transform">
                    <Sparkles className="w-6 h-6" />
                 </div>
                 <div>
-                   <h1 className="text-xl font-black text-primary tracking-tight leading-none uppercase">{user.brandName || 'KuskoDento'}</h1>
+                   <h1 className="text-xl font-black text-primary tracking-tight leading-none uppercase">{user.brandName || user.fullName || 'KuskoDento'}</h1>
                    <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest mt-1">{user.slogan || 'Digital Health'}</p>
                 </div>
               </div>
@@ -279,7 +285,7 @@ export function AppLayout({ children, isPayModalOpen: isPayModalOpenProp, setIsP
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
-              ))}
+                ))}
             </SidebarMenu>
           </SidebarContent>
         
@@ -369,54 +375,6 @@ export function AppLayout({ children, isPayModalOpen: isPayModalOpenProp, setIsP
             {children}
           </main>
         </SidebarInset>
-        <Dialog open={isPayModalOpen} onOpenChange={setIsPayModalOpen}>
-          <DialogContent className="sm:max-w-4xl rounded-[3.5rem] border-none shadow-[0_35px_60px_-15px_rgba(0,0,0,0.5)] max-h-[90vh] overflow-y-auto scrollbar-hide p-0">
-            <div className="bg-primary h-3" />
-            <div className="p-14 space-y-10">
-              <DialogHeader>
-                <DialogTitle className="flex items-center gap-4 text-3xl font-black tracking-tight">
-                  <div className="p-3 bg-emerald-100 text-emerald-600 rounded-2xl"><Banknote className="w-8 h-8" /></div>
-                  Medios de Pago Autorizados
-                </DialogTitle>
-                <DialogDescription className="text-lg font-bold text-slate-600 dark:text-slate-400 mt-4 leading-relaxed">
-                  Realice su abono mensual para mantener el servicio activo. Luego de pagar, reporte su comprobante para la validación manual.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                {paymentMethods.map(m => (
-                  <div key={m.id} className="p-8 rounded-[2.5rem] border-2 bg-slate-50 dark:bg-slate-900 flex flex-col items-center gap-6 transition-all hover:bg-white dark:hover:bg-slate-950 hover:shadow-2xl hover:border-primary/20 group">
-                     <div className="p-5 bg-white dark:bg-slate-800 rounded-2xl text-primary border shadow-sm group-hover:scale-110 transition-transform">
-                       {m.type === 'qr' ? <QrCode className="w-8 h-8" /> : <Building2 className="w-8 h-8" />}
-                     </div>
-                     <div className="text-center w-full space-y-3">
-                        <p className="text-[11px] font-black uppercase text-muted-foreground tracking-widest leading-none">{m.label}</p>
-                        <p className="text-2xl font-black text-slate-900 dark:text-white break-all leading-tight">{m.value}</p>
-                        {m.qrImage && (
-                          <div className="mt-8 p-6 bg-white rounded-[2rem] inline-block border-2 border-primary/10 shadow-2xl group-hover:border-primary/40 transition-colors">
-                            <img src={m.qrImage} className="w-64 h-64 object-contain mx-auto" alt="QR Scan" />
-                            <div className="mt-4 py-3 bg-primary text-white rounded-xl">
-                               <p className="text-[10px] font-black uppercase tracking-widest">Escanear QR</p>
-                            </div>
-                          </div>
-                        )}
-                     </div>
-                  </div>
-                ))}
-              </div>
-              <div className="pt-10 border-t space-y-8">
-                <p className="text-[11px] font-black text-center text-muted-foreground uppercase tracking-[0.4em]">Reportar Pago vía WhatsApp</p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  <a href="https://wa.me/51929110834" target="_blank" className="h-20 bg-emerald-600 text-white rounded-3xl font-black text-xs flex items-center justify-center gap-4 shadow-xl shadow-emerald-500/20 hover:bg-emerald-700 transition-all active:scale-95 uppercase tracking-widest px-8">
-                     <MessageCircle className="w-8 h-8" /> Soporte Admin 1
-                  </a>
-                  <a href="https://wa.me/51942239654" target="_blank" className="h-20 bg-emerald-600 text-white rounded-3xl font-black text-xs flex items-center justify-center gap-4 shadow-xl shadow-emerald-500/20 hover:bg-emerald-700 transition-all active:scale-95 uppercase tracking-widest px-8">
-                     <MessageCircle className="w-8 h-8" /> Soporte Admin 2
-                  </a>
-                </div>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
         <Dialog 
           open={isMoraReminderOpen} 
           onOpenChange={(open) => {
