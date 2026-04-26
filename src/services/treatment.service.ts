@@ -56,6 +56,18 @@ export const treatmentService = {
       throw new Error('Tratamiento no encontrado');
     }
 
+    // Verificar si hay citas o servicios facturados que referencian este tratamiento
+    const [appointmentCount, appointmentTreatmentCount] = await Promise.all([
+      prisma.appointment.count({ where: { treatment_id: id, clinic_id: clinicId } }),
+      prisma.appointmentTreatment.count({ where: { treatment_id: id, clinic_id: clinicId } }),
+    ]);
+
+    if (appointmentCount > 0 || appointmentTreatmentCount > 0) {
+      throw new Error(
+        `No se puede eliminar: este tratamiento está asociado a ${appointmentCount + appointmentTreatmentCount} cita(s). Desasócielo primero.`
+      );
+    }
+
     await prisma.treatment.delete({ where: { id: existing.id } });
     return { ok: true };
   },

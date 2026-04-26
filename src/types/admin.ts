@@ -7,6 +7,7 @@ export interface AdminUser {
   username?: string;
   role: AdminUserRole;
   fullName?: string;
+  ownerName?: string;
   dni?: string;
   clinicId?: string;
   status?: 'active' | 'inactive';

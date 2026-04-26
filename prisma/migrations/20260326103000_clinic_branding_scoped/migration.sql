@@ -1,4 +1,0 @@
-ALTER TABLE `Clinic`
-  MODIFY `logo_url` LONGTEXT NULL,
-  ADD COLUMN `primary_color` VARCHAR(191) NULL,
-  ADD COLUMN `slogan` VARCHAR(191) NULL;

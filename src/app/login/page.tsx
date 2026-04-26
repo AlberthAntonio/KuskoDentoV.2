@@ -71,7 +71,7 @@ function LoginContent() {
         <CardHeader className="space-y-1 text-center pt-10">
             <div className="w-48 h-auto mx-auto mb-6 flex items-center justify-center">
               <img 
-                src="/dento.png" 
+                src="/files/dento.png" 
                 alt="Logo Dento" 
                 className="w-full h-full object-contain filter drop-shadow-[0_10px_15px_rgba(0,0,0,0.4)]" 
               />

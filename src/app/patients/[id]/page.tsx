@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect, use } from 'react';
+import { useState, useEffect, use, useMemo } from 'react';
 import { AuthProvider } from '@/hooks/use-auth';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { Patient, Appointment, Payment, Odontogram } from '@/lib/legacy-data';
+import { db, Patient, Radiograph, Consent, Appointment, Payment, Odontogram } from '@/lib/legacy-data';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,7 +17,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PaymentModal } from '../../../components/PaymentModal';
-import { subirArchivoExterno } from '@/lib/external-upload';
 
 type ApiEnvelope<T> = {
   success?: boolean;
@@ -107,7 +106,14 @@ type PaymentApi = {
   total_paid: string | number;
   balance: string | number;
   created_at?: string | null;
-  appointment?: { treatment?: { name?: string | null } | null } | null;
+  appointment?: {
+    treatment?: { name?: string | null } | null;
+    appointment_treatments?: Array<{
+      treatment?: { name?: string | null } | null;
+      price: string | number;
+      observations?: string | null;
+    }>;
+  } | null;
   payment_histories?: Array<{
     amount_paid: string | number;
     payment_date: string;
@@ -121,6 +127,11 @@ type AppointmentApi = {
   patient?: { id?: string | null } | null;
   treatment_id?: string | null;
   treatment?: { name?: string | null } | null;
+  appointment_treatments?: Array<{
+    treatment?: { name?: string | null } | null;
+    price: string | number;
+    observations?: string | null;
+  }>;
   doctor_id?: string | null;
   doctor?: { full_name?: string | null } | null;
   date: string;
@@ -139,85 +150,17 @@ type OdontogramApi = {
   created_at: string;
 };
 
-type RadiographApi = {
-  id: string;
-  patient_id: string;
-  appointment_id?: string | null;
-  file_url: string;
-  file_name: string;
-  mime_type?: string | null;
-  type?: string | null;
-  created_at: string;
-};
-
-type ConsentApi = {
-  id: string;
-  patient_id: string;
-  consent_type: string;
-  document_url?: string | null;
-  created_at: string;
-};
-
-type RadiographItem = {
-  id: string;
-  patientId: string;
-  appointmentId?: string;
-  fileUrl: string;
-  type?: string;
-  date: string;
-  fileType: string;
-  fileName: string;
-};
-
-type ConsentItem = {
-  id: string;
-  patientId: string;
-  type: string;
-  date: string;
-  fileUrl: string;
-  fileType: string;
-  fileName: string;
-};
-
-const mimeTypeByExtension: Record<string, string> = {
-  pdf: 'application/pdf',
-  png: 'image/png',
-  jpg: 'image/jpeg',
-  jpeg: 'image/jpeg',
-  webp: 'image/webp',
-  gif: 'image/gif',
-  svg: 'image/svg+xml',
-};
-
-const inferMimeTypeFromFileName = (name: string): string => {
-  const cleanName = name.split('?')[0].split('#')[0];
-  const extension = cleanName.includes('.') ? cleanName.split('.').pop()?.toLowerCase() : undefined;
-  return extension ? mimeTypeByExtension[extension] || 'application/octet-stream' : 'application/octet-stream';
-};
-
-const getFileNameFromUrl = (url: string, fallback: string): string => {
-  try {
-    const parsed = new URL(url);
-    const lastSegment = parsed.pathname.split('/').filter(Boolean).pop();
-    return decodeURIComponent(lastSegment || fallback);
-  } catch {
-    const cleanUrl = url.split('?')[0];
-    const lastSegment = cleanUrl.split('/').filter(Boolean).pop();
-    return decodeURIComponent(lastSegment || fallback);
-  }
-};
-
 export default function PatientDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { toast } = useToast();
   const [patient, setPatient] = useState<Patient | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
-  const [radiographs, setRadiographs] = useState<RadiographItem[]>([]);
-  const [consents, setConsents] = useState<ConsentItem[]>([]);
+  const [radiographs, setRadiographs] = useState<Radiograph[]>([]);
+  const [consents, setConsents] = useState<Consent[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [odontograms, setOdontograms] = useState<Odontogram[]>([]);
   
-  const [previewData, setPreviewData] = useState<{ url: string; type: string; isObjectUrl?: boolean } | null>(null);
+  const [previewData, setPreviewData] = useState<{ url: string; type: string } | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [paymentForm, setPaymentForm] = useState({ amount: '', method: 'cash', notes: '' });
@@ -229,13 +172,11 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
 
   const loadAll = async () => {
     try {
-      const [patientApi, paymentsApi, appointmentsApi, odontogramsApi, radiographsApi, consentsApi] = await Promise.all([
+      const [patientApi, paymentsApi, appointmentsApi, odontogramsApi] = await Promise.all([
         fetchApi<PatientApi>(`/api/patients/${id}`),
         fetchApi<{ items: PaymentApi[] }>(`/api/payments?patient_id=${id}`),
         fetchApi<{ items: AppointmentApi[] }>(`/api/appointments?patient_id=${id}`),
         fetchApi<{ items: OdontogramApi[] }>(`/api/odontograms?patient_id=${id}`),
-        fetchApi<{ items: RadiographApi[] }>(`/api/radiographs?patient_id=${id}`),
-        fetchApi<{ items: ConsentApi[] }>(`/api/consents?patient_id=${id}`),
       ]);
 
       const nameParts = splitFullName(patientApi.full_name);
@@ -263,21 +204,30 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
 
       const mappedPayments = (paymentsApi.items || [])
         .sort((a, b) => parseDateValue(b.created_at) - parseDateValue(a.created_at))
-        .map((payment): Payment => ({
-          id: payment.id,
-          patientId: payment.patient_id,
-          appointmentId: payment.appointment_id,
-          treatmentName: payment.appointment?.treatment?.name || 'Consulta',
-          totalPaid: toNumber(payment.total_paid),
-          balance: toNumber(payment.balance),
-          totalCost: toNumber(payment.total_cost),
-          date: toDisplayDate(payment.created_at),
-          history: (payment.payment_histories || []).map((item) => ({
-            amount: toNumber(item.amount_paid),
-            date: toDisplayDate(item.payment_date),
-            method: item.payment_method || undefined,
-          })),
-        }));
+        .map((payment): Payment => {
+          const services = payment.appointment?.appointment_treatments
+            ?.map((item) => item.treatment?.name || '')
+            .filter((name) => Boolean(name));
+          const treatmentName = services && services.length > 0
+            ? services.join(', ')
+            : payment.appointment?.treatment?.name || 'Consulta';
+
+          return {
+            id: payment.id,
+            patientId: payment.patient_id,
+            appointmentId: payment.appointment_id,
+            treatmentName,
+            totalPaid: toNumber(payment.total_paid),
+            balance: toNumber(payment.balance),
+            totalCost: toNumber(payment.total_cost),
+            date: toDisplayDate(payment.created_at),
+            history: (payment.payment_histories || []).map((item) => ({
+              amount: toNumber(item.amount_paid),
+              date: toDisplayDate(item.payment_date),
+              method: item.payment_method || undefined,
+            })),
+          };
+        });
 
       const paidAppointmentIds = new Set(
         mappedPayments.map((payment) => payment.appointmentId).filter(Boolean)
@@ -291,17 +241,26 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
             !paidAppointmentIds.has(appointment.id)
           );
         })
-        .map((appointment): Payment => ({
-          id: `pending-${appointment.id}`,
-          patientId: appointment.patient_id || appointment.patient?.id || id,
-          appointmentId: appointment.id,
-          treatmentName: appointment.treatment?.name || 'Consulta',
-          totalPaid: 0,
-          balance: toNumber(appointment.cost),
-          totalCost: toNumber(appointment.cost),
-          date: toDisplayDate(appointment.date),
-          history: [],
-        }));
+        .map((appointment): Payment => {
+          const services = (appointment.appointment_treatments || [])
+            .map((item) => item.treatment?.name || '')
+            .filter((name) => Boolean(name));
+          const treatmentName = services.length > 0
+            ? services.join(', ')
+            : appointment.treatment?.name || 'Consulta';
+
+          return {
+            id: `pending-${appointment.id}`,
+            patientId: appointment.patient_id || appointment.patient?.id || id,
+            appointmentId: appointment.id,
+            treatmentName,
+            totalPaid: 0,
+            balance: toNumber(appointment.cost),
+            totalCost: toNumber(appointment.cost),
+            date: toDisplayDate(appointment.date),
+            history: [],
+          };
+        });
 
       setPayments(
         [...mappedPayments, ...pendingFromAppointments].sort(
@@ -312,7 +271,20 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
       setAppointments(
         (appointmentsApi.items || [])
           .sort((a, b) => parseDateValue(b.date) - parseDateValue(a.date))
-          .map((appointment): Appointment => ({
+          .map((appointment): Appointment => {
+            const services = (appointment.appointment_treatments || [])
+              .map((item) => ({
+                name: item.treatment?.name || 'Consulta',
+                cost: toNumber(item.price),
+                observations: item.observations || undefined,
+              }))
+              .filter((item) => item.name || item.cost > 0);
+
+            const treatmentName = services.length > 0
+              ? services.map((service) => service.name).join(', ')
+              : appointment.treatment?.name || 'Consulta';
+
+            return {
             id: appointment.id,
             patientId: appointment.patient_id || appointment.patient?.id || '',
             treatmentId: appointment.treatment_id || '',
@@ -326,45 +298,15 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
                 : 'Asignado',
             cost: toNumber(appointment.cost),
             observations: appointment.observations || undefined,
-          }))
-      );
-
-      setRadiographs(
-        (radiographsApi.items || [])
-          .sort((a, b) => parseDateValue(b.created_at) - parseDateValue(a.created_at))
-          .map((item): RadiographItem => ({
-            id: item.id,
-            patientId: item.patient_id,
-            appointmentId: item.appointment_id || undefined,
-            fileUrl: item.file_url,
-            type: item.type || undefined,
-            date: toDisplayDate(item.created_at),
-            fileType: item.mime_type || inferMimeTypeFromFileName(item.file_name),
-            fileName: item.file_name,
-          }))
-      );
-
-      setConsents(
-        (consentsApi.items || [])
-          .filter((item) => Boolean(item.document_url))
-          .sort((a, b) => parseDateValue(b.created_at) - parseDateValue(a.created_at))
-          .map((item, index): ConsentItem => {
-            const fileUrl = String(item.document_url);
-            const fallbackName = `consentimiento-${index + 1}`;
-            const fileName = getFileNameFromUrl(fileUrl, fallbackName);
-
-            return {
-              id: item.id,
-              patientId: item.patient_id,
-              type: item.consent_type,
-              date: toDisplayDate(item.created_at),
-              fileUrl,
-              fileType: inferMimeTypeFromFileName(fileName),
-              fileName,
+            treatmentName,
+            services,
             };
           })
       );
 
+      // No existen endpoints REST para estos modulos en la version actual.
+      setRadiographs([]);
+      setConsents([]);
       setOdontograms(
         (odontogramsApi.items || [])
           .sort((a, b) => parseDateValue(b.created_at) - parseDateValue(a.created_at))
@@ -388,149 +330,57 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
     }
   };
 
-  const uploadImage = async (file: File) => {
-    const url = await subirArchivoExterno(file);
-    if (!url) {
-      throw new Error('No se pudo subir la imagen');
-    }
-
-    return { url };
-  };
-
-  const saveRadiograph = async (data: {
-    patient_id: string;
-    appointment_id?: string;
-    file_url: string;
-    file_name: string;
-    file_size: number;
-    mime_type?: string;
-    type?: string;
-    notes?: string;
-  }) => {
-    const response = await fetch('/api/radiographs', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify(data),
-    });
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'No se pudo guardar la radiografía');
-    }
-    return await response.json();
-  };
-
-  const saveConsent = async (data: {
-    patient_id: string;
-    appointment_id?: string;
-    consent_type: string;
-    document_url: string;
-    notes?: string;
-  }) => {
-    const response = await fetch('/api/consents', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify(data),
-    });
-    if (!response.ok) {
-      const error = await response.json().catch(() => null);
-      throw new Error(error?.error || 'No se pudo guardar el consentimiento');
-    }
-    return await response.json();
-  };
-
   const handleFileUpload = async (type: 'radiograph' | 'consent', e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    const data: any = {
+      id: crypto.randomUUID(),
+      patientId: id,
+      fileName: file.name,
+      fileType: file.type,
+      fileBlob: file, 
+      date: new Date().toLocaleDateString('es-PE'),
+    };
+
+    const store = type === 'radiograph' ? 'radiographs' : 'consents';
     try {
-      // 1. Subir imagen
-      const uploadResult = await uploadImage(file);
-      // 2. Guardar registro en la base de datos
-      if (type === 'radiograph') {
-        await saveRadiograph({
-          patient_id: id,
-          file_url: uploadResult.url,
-          file_name: file.name,
-          file_size: file.size,
-          mime_type: file.type,
-        });
-      } else {
-        await saveConsent({
-          patient_id: id,
-          consent_type: file.type.includes('pdf') ? 'consentimiento_pdf' : 'consentimiento_imagen',
-          document_url: uploadResult.url,
-        });
-      }
-      toast({ title: "Archivo subido", description: "El documento se guardó correctamente." });
+      await db.put(store, data);
+      toast({ title: "Archivo subido", description: "El documento se guardo correctamente." });
       loadAll();
     } catch (error) {
       toast({
-        title: 'Error al subir archivo',
-        description: error instanceof Error ? error.message : 'No se pudo guardar la imagen.',
+        title: 'Modulo en migracion',
+        description: error instanceof Error ? error.message : 'Aun no se pudo guardar este archivo.',
         variant: 'destructive',
       });
     }
-    e.target.value = '';
+    e.target.value = ''; 
   };
 
-  const downloadFile = (fileSource: Blob | string, fileName: string) => {
-    const url = typeof fileSource === 'string' ? fileSource : URL.createObjectURL(fileSource);
+  const downloadFile = (fileBlob: Blob, fileName: string) => {
+    const url = URL.createObjectURL(fileBlob);
     const a = document.createElement('a');
     a.href = url;
     a.download = fileName;
     a.click();
-    if (typeof fileSource !== 'string') {
-      URL.revokeObjectURL(url);
-    }
+    URL.revokeObjectURL(url);
   };
 
-  const closePreview = () => {
-    setPreviewData((prev) => {
-      if (prev?.isObjectUrl) {
-        URL.revokeObjectURL(prev.url);
-      }
-      return null;
-    });
-  };
-
-  const openPreview = (file: string | Blob, fileType: string) => {
-    setPreviewData((prev) => {
-      if (prev?.isObjectUrl) {
-        URL.revokeObjectURL(prev.url);
-      }
-
-      if (typeof file === 'string') {
-        return { url: file, type: fileType };
-      }
-
-      return {
-        url: URL.createObjectURL(file),
-        type: fileType,
-        isObjectUrl: true,
-      };
-    });
+  const openPreview = (fileBlob: Blob, fileType: string) => {
+    const url = URL.createObjectURL(fileBlob);
+    setPreviewData({ url, type: fileType });
   };
 
   const deleteFile = async (store: 'radiographs' | 'consents', fileId: string) => {
     if (confirm("¿Eliminar este archivo permanentemente?")) {
       try {
-        const endpoint = store === 'radiographs' ? `/api/radiographs/${fileId}` : `/api/consents/${fileId}`;
-        const response = await fetch(endpoint, {
-          method: 'DELETE',
-          credentials: 'include',
-        });
-
-        if (!response.ok) {
-          const error = await response.json().catch(() => null);
-          throw new Error(error?.error || 'No se pudo eliminar el archivo');
-        }
-
+        await db.delete(store, fileId);
         loadAll();
       } catch (error) {
         toast({
-          title: 'Error al eliminar archivo',
-          description: error instanceof Error ? error.message : 'No se pudo eliminar este archivo.',
+          title: 'Modulo en migracion',
+          description: error instanceof Error ? error.message : 'Aun no se pudo eliminar este archivo.',
           variant: 'destructive',
         });
       }
@@ -539,9 +389,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
 
   const openPaymentModal = (appointment: Appointment) => {
     setSelectedAppointment(appointment);
-    const existingPayments = payments.filter((p) => p.appointmentId === appointment.id && !String(p.id).startsWith('pending-'));
-    const remaining = existingPayments.length > 0 ? existingPayments.reduce((acc, p) => acc + p.balance, 0) : appointment.cost;
-    setPaymentForm({ amount: remaining.toFixed(2), method: 'cash', notes: '' });
+    setPaymentForm({ amount: appointment.cost.toFixed(2), method: 'cash', notes: '' });
     setShowPaymentModal(true);
   };
 
@@ -553,34 +401,19 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
 
     setIsSubmittingPayment(true);
     try {
-      const existingPayment = payments.find((p) => p.appointmentId === selectedAppointment.id && !String(p.id).startsWith('pending-'));
-      let response: Response;
-      if (existingPayment) {
-        response = await fetch(`/api/payments/${existingPayment.id}/history`, {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            amount_paid: Number(paymentForm.amount),
-            payment_method: paymentForm.method,
-            reference: paymentForm.notes,
-          }),
-        });
-      } else {
-        response = await fetch('/api/payments', {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            patient_id: id,
-            appointment_id: selectedAppointment.id,
-            amount: Number(paymentForm.amount),
-            payment_method: paymentForm.method,
-            notes: paymentForm.notes,
-            total_cost: selectedAppointment.cost,
-          }),
-        });
-      }
+      const response = await fetch('/api/payments', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          patient_id: id,
+          appointment_id: selectedAppointment.id,
+          amount: Number(paymentForm.amount),
+          payment_method: paymentForm.method,
+          notes: paymentForm.notes,
+          total_cost: selectedAppointment.cost,
+        }),
+      });
 
       if (!response.ok) {
         const error = await response.json();
@@ -602,6 +435,59 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
     }
   };
 
+  const groupedTreatments = useMemo(() => {
+    const grouped = new Map<
+      string,
+      {
+        name: string;
+        total: number;
+        sessions: Array<{
+          id: string;
+          date: string;
+          time: string;
+          doctorName: string;
+          status: Appointment['status'];
+          cost: number;
+          observations?: string;
+        }>;
+      }
+    >();
+
+    appointments.forEach((appointment) => {
+      const services = Array.isArray(appointment.services) && appointment.services.length > 0
+        ? appointment.services
+        : [{
+            name: appointment.treatmentName || 'Consulta',
+            cost: appointment.cost,
+            observations: appointment.observations,
+          }];
+
+      services.forEach((service) => {
+        const rawName = String(service.name || 'Consulta').trim() || 'Consulta';
+        const key = rawName.toLowerCase();
+        const entry = grouped.get(key) || {
+          name: rawName,
+          total: 0,
+          sessions: [],
+        };
+
+        entry.sessions.push({
+          id: appointment.id,
+          date: appointment.date,
+          time: appointment.time,
+          doctorName: appointment.doctorName,
+          status: appointment.status,
+          cost: Number(service.cost || 0),
+          observations: service.observations ?? undefined,
+        });
+        entry.total += Number(service.cost || 0);
+        grouped.set(key, entry);
+      });
+    });
+
+    return Array.from(grouped.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [appointments]);
+
   if (!patient) return null;
 
   return (
@@ -614,7 +500,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
                 <Link href="/patients"><ChevronLeft /></Link>
               </Button>
               <div>
-                <h2 className="text-3xl font-bold text-primary">{`${patient.names}${patient.lastNames ? ` ${patient.lastNames}` : ''}`.toUpperCase()}</h2>
+                <h2 className="text-3xl font-bold text-primary">{patient.lastNames}, {patient.names}</h2>
                 <div className="flex gap-4 mt-1">
                   <Badge variant="outline" className="border-primary text-primary">DNI: {patient.dni}</Badge>
                   <span className="text-sm text-muted-foreground">Paciente desde: {patient.registrationDate}</span>
@@ -632,14 +518,60 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
           </div>
 
           <Tabs defaultValue="overview" className="space-y-6">
-            <TabsList className="bg-muted p-1 rounded-xl h-auto flex flex-wrap justify-start gap-1">
+            <TabsList className="bg-muted p-1 rounded-xl h-auto flex flex-nowrap justify-start gap-1 overflow-x-auto scrollbar-thin">
               <TabsTrigger value="overview" className="gap-2 py-3 px-6"><Eye className="w-4 h-4" /> Resumen</TabsTrigger>
               <TabsTrigger value="radiographs" className="gap-2 py-3 px-6"><ImageIcon className="w-4 h-4" /> Radiografías</TabsTrigger>
               <TabsTrigger value="consents" className="gap-2 py-3 px-6"><FileText className="w-4 h-4" /> Consentimientos</TabsTrigger>
               <TabsTrigger value="odontograms" className="gap-2 py-3 px-6"><Activity className="w-4 h-4" /> Odontogramas</TabsTrigger>
               <TabsTrigger value="payments" className="gap-2 py-3 px-6"><CreditCard className="w-4 h-4" /> Pagos/Saldos</TabsTrigger>
               <TabsTrigger value="appointments" className="gap-2 py-3 px-6"><Calendar className="w-4 h-4" /> Citas</TabsTrigger>
+              <TabsTrigger value="treatments" className="gap-2 py-3 px-6"><History className="w-4 h-4" /> Tratamientos</TabsTrigger>
             </TabsList>
+
+            <TabsContent value="treatments">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {groupedTreatments.length > 0 ? (
+                  groupedTreatments.map((group, idx) => (
+                    <Card key={group.name} className="border-none shadow-sm hover:shadow-md transition-all">
+                      <CardHeader className="bg-primary/5 p-4 flex flex-row justify-between items-center">
+                        <div>
+                          <p className="text-[10px] uppercase font-bold text-muted-foreground">Tratamiento #{idx + 1}</p>
+                          <p className="font-bold text-sm">{group.name}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-[10px] uppercase text-muted-foreground">Sesiones</p>
+                          <p className="text-sm font-bold">{group.sessions.length}</p>
+                          <p className="text-[10px] uppercase text-muted-foreground mt-1">Total</p>
+                          <p className="text-sm font-bold text-emerald-600">S/. {group.total.toFixed(2)}</p>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="p-4 space-y-2">
+                        {group.sessions.map((session, sidx) => (
+                          <div key={`${group.name}-${session.id}-${sidx}`} className="rounded-lg border bg-slate-50/50 p-3">
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <p className="text-[10px] uppercase font-bold text-muted-foreground">Cita {sidx + 1}</p>
+                                <p className="text-sm font-medium">{session.date} - {session.time}</p>
+                                <p className="text-[10px] text-muted-foreground">Dr. {session.doctorName}</p>
+                              </div>
+                              <div className="text-right">
+                                <Badge variant={session.status === 'Atendido' ? 'default' : 'secondary'}>{session.status}</Badge>
+                                <p className="mt-2 text-sm font-bold text-emerald-600">S/. {session.cost.toFixed(2)}</p>
+                              </div>
+                            </div>
+                            {session.observations ? (
+                              <p className="mt-2 text-xs text-muted-foreground italic">{session.observations}</p>
+                            ) : null}
+                          </div>
+                        ))}
+                      </CardContent>
+                    </Card>
+                  ))
+                ) : (
+                  <div className="col-span-full py-12 text-center text-muted-foreground border-2 border-dashed rounded-xl">No hay tratamientos registrados</div>
+                )}
+              </div>
+            </TabsContent>
 
             <TabsContent value="overview">
                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -717,11 +649,12 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
                    {radiographs.map(r => (
                      <Card key={r.id} className="overflow-hidden group relative border-none shadow-sm hover:shadow-md transition-all">
-                       <div className="aspect-square bg-slate-100 flex items-center justify-center overflow-hidden cursor-pointer" onClick={() => openPreview(r.fileUrl, r.fileType)}>
+                       <div className="aspect-square bg-slate-100 flex items-center justify-center overflow-hidden cursor-pointer" onClick={() => openPreview(r.fileBlob, r.fileType)}>
                           <img 
-                            src={r.fileUrl} 
+                            src={URL.createObjectURL(r.fileBlob)} 
                             className="w-full h-full object-cover transition-transform group-hover:scale-105" 
                             alt={r.fileName}
+                            onLoad={(e) => URL.revokeObjectURL((e.target as any).src)}
                           />
                           <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                             <ZoomIn className="text-white w-8 h-8" />
@@ -732,7 +665,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
                           <p className="text-[9px] text-muted-foreground">{r.date}</p>
                        </div>
                        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
-                         <Button variant="secondary" size="icon" className="h-7 w-7" onClick={() => downloadFile(r.fileUrl, r.fileName)}><Download className="w-3 h-3" /></Button>
+                         <Button variant="secondary" size="icon" className="h-7 w-7" onClick={() => downloadFile(r.fileBlob, r.fileName)}><Download className="w-3 h-3" /></Button>
                          <Button variant="destructive" size="icon" className="h-7 w-7" onClick={() => deleteFile('radiographs', r.id)}><Trash2 className="w-3 h-3" /></Button>
                        </div>
                      </Card>
@@ -773,7 +706,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
                           </div>
                        </div>
                        <div className="flex gap-2">
-                          <Button variant="ghost" size="sm" onClick={() => openPreview(c.fileUrl, c.fileType)}>Previsualizar</Button>
+                          <Button variant="ghost" size="sm" onClick={() => openPreview(c.fileBlob, c.fileType)}>Previsualizar</Button>
                           <Button variant="ghost" size="icon" className="text-destructive opacity-0 group-hover:opacity-100" onClick={() => deleteFile('consents', c.id)}><Trash2 className="w-4 h-4" /></Button>
                        </div>
                      </Card>
@@ -891,8 +824,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
                       </TableHeader>
                       <TableBody>
                         {appointments.map(a => {
-                          const totalPaidForAppointment = payments.reduce((acc, p) => (p.appointmentId === a.id ? acc + p.totalPaid : acc), 0);
-                          const isFullyPaid = totalPaidForAppointment >= a.cost;
+                          const hasPaidForAppointment = payments.some(p => p.appointmentId === a.id);
                           return (
                             <TableRow key={a.id}>
                               <TableCell className="font-medium">{a.date} - {a.time}</TableCell>
@@ -901,14 +833,13 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
                               <TableCell className="font-bold">S/. {a.cost.toFixed(2)}</TableCell>
                               <TableCell className="text-xs italic">{a.observations || '-'}</TableCell>
                               <TableCell>
-                                {isFullyPaid ? (
-                                  <Badge variant="default" className="bg-emerald-500">Pagado</Badge>
-                                ) : a.status === 'Atendido' ? (
+                                {a.status === 'Atendido' && !hasPaidForAppointment && (
                                   <Button size="sm" variant="outline" onClick={() => openPaymentModal(a)}>
                                     Registrar Pago
                                   </Button>
-                                ) : (
-                                  <Badge variant="outline" className="text-amber-600 border-amber-600">PENDIENTE</Badge>
+                                )}
+                                {hasPaidForAppointment && (
+                                  <Badge variant="default" className="bg-emerald-500">Pagado</Badge>
                                 )}
                               </TableCell>
                             </TableRow>
@@ -923,13 +854,11 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
         </div>
 
         {/* Modal de Zoom General y PDF Preview */}
-        <Dialog open={!!previewData} onOpenChange={(open) => {
-          if (!open) closePreview();
-        }}>
+        <Dialog open={!!previewData} onOpenChange={() => setPreviewData(null)}>
            <DialogContent className="max-w-[95vw] h-[95vh] flex flex-col p-0 bg-black/95 border-none">
               <div className="flex justify-between items-center p-4 bg-black/40 text-white z-50">
                 <span className="text-sm font-medium">Previsualización de Documento</span>
-                <Button variant="ghost" size="icon" className="text-white hover:bg-white/20" onClick={closePreview}>
+                <Button variant="ghost" size="icon" className="text-white hover:bg-white/20" onClick={() => setPreviewData(null)}>
                   <X className="w-6 h-6" />
                 </Button>
               </div>

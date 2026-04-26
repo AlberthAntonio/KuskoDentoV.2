@@ -7,11 +7,14 @@ CREATE TABLE `Clinic` (
     `email` VARCHAR(191) NULL,
     `address` VARCHAR(191) NULL,
     `logo_url` VARCHAR(191) NULL,
+    `slogan` VARCHAR(191) NULL,
+    `primary_color` VARCHAR(191) NULL,
     `theme` VARCHAR(191) NOT NULL DEFAULT 'light',
     `subscription_status` VARCHAR(191) NOT NULL DEFAULT 'active',
     `subscription_tier` VARCHAR(191) NOT NULL DEFAULT 'basic',
     `next_payment_date` DATETIME(3) NULL,
     `contract_start_date` DATETIME(3) NULL,
+    `subscription_fee` DECIMAL(10, 2) NOT NULL DEFAULT 50.00;
     `created_by` VARCHAR(191) NULL,
     `created_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updated_at` DATETIME(3) NOT NULL,
@@ -135,6 +138,7 @@ CREATE TABLE `Appointment` (
     UNIQUE INDEX `Appointment_clinic_id_id_key`(`clinic_id`, `id`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
 
 -- CreateTable
 CREATE TABLE `Payment` (
@@ -279,6 +283,15 @@ ALTER TABLE `Appointment` ADD CONSTRAINT `Appointment_doctor_id_fkey` FOREIGN KE
 
 -- AddForeignKey
 ALTER TABLE `Appointment` ADD CONSTRAINT `Appointment_treatment_id_fkey` FOREIGN KEY (`treatment_id`) REFERENCES `Treatment`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `AppointmentTreatment` ADD CONSTRAINT `AppointmentTreatment_clinic_id_fkey` FOREIGN KEY (`clinic_id`) REFERENCES `Clinic`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `AppointmentTreatment` ADD CONSTRAINT `AppointmentTreatment_appointment_id_fkey` FOREIGN KEY (`appointment_id`) REFERENCES `Appointment`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `AppointmentTreatment` ADD CONSTRAINT `AppointmentTreatment_treatment_id_fkey` FOREIGN KEY (`treatment_id`) REFERENCES `Treatment`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE `Payment` ADD CONSTRAINT `Payment_clinic_id_fkey` FOREIGN KEY (`clinic_id`) REFERENCES `Clinic`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;

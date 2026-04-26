@@ -15,6 +15,7 @@ export interface AuthUser {
   username?: string;
   fullName?: string;
   full_name?: string;
+  dni?: string;
   role: Role;
   clinicId?: string;
   clinic_id?: string;
@@ -43,7 +44,9 @@ interface MeResponse {
     user: {
       id: string;
       email: string | null;
+      username?: string | null;
       full_name: string | null;
+      dni?: string | null;
       role: string;
       clinic_id: string;
     };
@@ -67,7 +70,9 @@ type AuthPayload = {
   user: {
     id: string;
     email: string | null;
+    username?: string | null;
     full_name: string | null;
+    dni?: string | null;
     role: string;
     clinic_id: string;
   };
@@ -136,9 +141,10 @@ function normalizeUser(payload: NonNullable<MeResponse['data']>): AuthUser {
   return {
     id: payload.user.id,
     email: payload.user.email ?? undefined,
-    username: payload.user.email ?? undefined,
+    username: payload.user.username ?? payload.user.email ?? undefined,
     fullName: payload.user.full_name ?? undefined,
     full_name: payload.user.full_name ?? undefined,
+    dni: payload.user.dni ?? undefined,
     role: payload.user.role,
     clinicId: payload.user.clinic_id,
     clinic_id: payload.user.clinic_id,

@@ -23,11 +23,33 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (!clinicId) return apiError('No autorizado', 401);
 
     const body = await request.json();
+    const { id } = await params;
+
+    // Si solo se envía status, usar updateStatus (retrocompatible)
+    const hasFullData = body.patient_id || body.doctor_id || body.date || body.time || body.cost !== undefined || body.services;
+
+    if (hasFullData) {
+      const updated = await appointmentService.update(clinicId, id, {
+        patient_id: typeof body.patient_id === 'string' ? body.patient_id : undefined,
+        doctor_id: typeof body.doctor_id === 'string' ? body.doctor_id : undefined,
+        treatment_id: body.treatment_id !== undefined ? (body.treatment_id || null) : undefined,
+        date: body.date ? new Date(body.date) : undefined,
+        time: typeof body.time === 'string' ? body.time : undefined,
+        cost: typeof body.cost === 'number' ? body.cost : undefined,
+        status: typeof body.status === 'string' ? body.status : undefined,
+        observations: typeof body.observations === 'string' ? body.observations : undefined,
+        duration_minutes: typeof body.duration_minutes === 'number' ? body.duration_minutes : undefined,
+        services: Array.isArray(body.services) ? body.services : undefined,
+      });
+      return apiOk(updated);
+    }
+
+    // Fallback: solo actualizar estado
     const status = typeof body?.status === 'string' ? body.status : '';
     if (!status) return apiError('Estado invalido', 400);
 
-    const { id } = await params;
-    const updated = await appointmentService.updateStatus(clinicId, id, status);
+    const duration_minutes = typeof body.duration_minutes === 'number' ? body.duration_minutes : undefined;
+    const updated = await appointmentService.updateStatus(clinicId, id, status, duration_minutes);
     return apiOk(updated);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Error interno';

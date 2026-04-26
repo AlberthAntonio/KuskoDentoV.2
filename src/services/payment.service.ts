@@ -18,6 +18,13 @@ export const paymentService = {
             time: true,
             status: true,
             treatment: { select: { id: true, name: true } },
+            appointment_treatments: {
+              select: {
+                treatment: { select: { id: true, name: true } },
+                price: true,
+                observations: true,
+              },
+            },
           },
         },
         payment_histories: {
@@ -80,13 +87,6 @@ export const paymentService = {
         },
       });
 
-      if (balance.eq(0) && appointment.status !== 'completed') {
-        await tx.appointment.update({
-          where: { id: appointment.id },
-          data: { status: 'completed' },
-        });
-      }
-
       return tx.payment.findUnique({
         where: { id: payment.id },
         include: {
@@ -98,6 +98,13 @@ export const paymentService = {
               time: true,
               status: true,
               treatment: { select: { id: true, name: true } },
+              appointment_treatments: {
+                select: {
+                  treatment: { select: { id: true, name: true } },
+                  price: true,
+                  observations: true,
+                },
+              },
             },
           },
           payment_histories: { orderBy: { payment_date: 'asc' } },
@@ -144,13 +151,6 @@ export const paymentService = {
         },
       });
 
-      if (updated.balance.eq(0) && payment.appointment.status !== 'completed') {
-        await tx.appointment.update({
-          where: { id: payment.appointment_id },
-          data: { status: 'completed' },
-        });
-      }
-
       return tx.payment.findUnique({
         where: { id: payment.id },
         include: {
@@ -162,6 +162,13 @@ export const paymentService = {
               time: true,
               status: true,
               treatment: { select: { id: true, name: true } },
+              appointment_treatments: {
+                select: {
+                  treatment: { select: { id: true, name: true } },
+                  price: true,
+                  observations: true,
+                },
+              },
             },
           },
           payment_histories: { orderBy: { payment_date: 'asc' } },
@@ -182,6 +189,13 @@ export const paymentService = {
             time: true,
             status: true,
             treatment: { select: { id: true, name: true } },
+            appointment_treatments: {
+              select: {
+                treatment: { select: { id: true, name: true } },
+                price: true,
+                observations: true,
+              },
+            },
           },
         },
         payment_histories: { orderBy: { payment_date: 'asc' } },

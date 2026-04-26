@@ -25,7 +25,6 @@ const patientFullListSelect = {
   under_treatment: true,
   prone_to_bleeding: true,
   allergic_to_meds: true,
-  allergies_detail: true,
   medical_observations: true,
 } as const;
 
@@ -46,9 +45,7 @@ const patientDetailSelect = {
   under_treatment: true,
   prone_to_bleeding: true,
   allergic_to_meds: true,
-  allergies_detail: true,
   medical_observations: true,
-  registered_by: true,
   created_at: true,
   updated_at: true,
 } as const;
@@ -100,7 +97,7 @@ export const patientService = {
     dni: string;
     full_name: string;
     phone: string;
-    address: string;
+    address?: string;
     email?: string;
     first_name?: string;
     last_name?: string;
@@ -109,11 +106,6 @@ export const patientService = {
     postal_code?: string;
     gender?: string;
     medical_observations?: string;
-    under_treatment?: boolean;
-    prone_to_bleeding?: boolean;
-    allergic_to_meds?: boolean;
-    allergies_detail?: string;
-    registered_by?: string;
   }) {
     const exists = await prisma.patient.findFirst({
       where: { clinic_id: clinicId, dni: data.dni },
@@ -130,7 +122,7 @@ export const patientService = {
         dni: data.dni,
         full_name: data.full_name,
         phone: data.phone,
-        address: data.address,
+        address: data.address ?? null,
         email: data.email,
         first_name: data.first_name,
         last_name: data.last_name,
@@ -139,11 +131,6 @@ export const patientService = {
         postal_code: data.postal_code,
         gender: data.gender,
         medical_observations: data.medical_observations,
-        under_treatment: typeof data.under_treatment === 'boolean' ? data.under_treatment : false,
-        prone_to_bleeding: typeof data.prone_to_bleeding === 'boolean' ? data.prone_to_bleeding : false,
-        allergic_to_meds: typeof data.allergic_to_meds === 'boolean' ? data.allergic_to_meds : false,
-        allergies_detail: typeof data.allergies_detail === 'string' ? data.allergies_detail : undefined,
-        registered_by: typeof data.registered_by === 'string' ? data.registered_by : undefined,
       },
     });
   },
@@ -171,11 +158,6 @@ export const patientService = {
           typeof data.medical_observations === 'string'
             ? data.medical_observations
             : current.medical_observations,
-        under_treatment: typeof data.under_treatment === 'boolean' ? data.under_treatment : current.under_treatment,
-        prone_to_bleeding: typeof data.prone_to_bleeding === 'boolean' ? data.prone_to_bleeding : current.prone_to_bleeding,
-        allergic_to_meds: typeof data.allergic_to_meds === 'boolean' ? data.allergic_to_meds : current.allergic_to_meds,
-        allergies_detail: typeof data.allergies_detail === 'string' ? data.allergies_detail : current.allergies_detail,
-        registered_by: typeof data.registered_by === 'string' ? data.registered_by : current.registered_by,
       },
     });
   },

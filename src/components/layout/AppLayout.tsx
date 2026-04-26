@@ -1,17 +1,13 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from 'react'; // Añadido useCallback
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { SidebarProvider, Sidebar, SidebarContent, SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarTrigger, SidebarInset } from '@/components/ui/sidebar';
-import { Users, UserSquare2, Stethoscope, Landmark, Activity, Calendar, Database, LogOut, LayoutDashboard, ShieldCheck, BarChart3, CreditCard, AlertTriangle, QrCode, Building2, ShieldAlert, Banknote, User as UserIcon, MessageCircle, Boxes, Wallet, Timer, AlertCircle, Sun, Moon, Sparkles, Copy } from 'lucide-react'; // Limpiadas variables no usadas
+import { Users, UserSquare2, Stethoscope, Landmark, Activity, Calendar, LayoutDashboard, ShieldCheck, BarChart3, CreditCard, AlertTriangle, QrCode, Building2, ShieldAlert, Banknote, User as UserIcon, MessageCircle, Boxes, Timer, AlertCircle, Sun, Moon, Sparkles } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
-import { format, parseISO, differenceInCalendarDays } from 'date-fns';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
-import { useToast } from '@/hooks/use-toast';
-import { db } from '@/lib/legacy-data';
+import { parseISO, differenceInCalendarDays } from 'date-fns';
+import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 
@@ -21,8 +17,6 @@ type PaymentMethod = {
   label: string;
   value: string;
   qrImage?: string;
-  holder?: string;
-  cci?: string;
 };
 
 function hexToHsl(hex: string) {
@@ -38,7 +32,9 @@ function hexToHsl(hex: string) {
   }
   r /= 255; g /= 255; b /= 255;
   const max = Math.max(r, g, b), min = Math.min(r, g, b);
-  let h = 0, s = 0, l = (max + min) / 2;
+  let h = 0;
+  let s = 0;
+  const l = (max + min) / 2;
   if (max !== min) {
     const d = max - min;
     s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
@@ -72,19 +68,15 @@ function getReminderIntervalLabel(graceDay: number): string {
   return '5 minutos';
 }
 
-export function AppLayout({ children }: { children: React.ReactNode }) {
+export function AppLayout({ children, setIsPayModalOpen: setIsPayModalOpenProp }: { children: React.ReactNode, setIsPayModalOpen?: (isOpen: boolean) => void }) {
   const { user, logout, updateUser } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
-  const { toast } = useToast(); // Movido aquí arriba para cumplir con Rules of Hooks
   
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
-  const [isPayModalOpen, setIsPayModalOpen] = useState(false);
+  const setIsPayModalOpen = setIsPayModalOpenProp ?? (() => {});
   const [isMoraReminderOpen, setIsMoraReminderOpen] = useState(false);
   const [moraCountdown, setMoraCountdown] = useState(5);
-  const [qrPreview, setQrPreview] = useState<string | null>(null);
-  const [isQrOpen, setIsQrOpen] = useState(false);
-
   const overdueDays = user?.nextPaymentDate
     ? Math.max(0, differenceInCalendarDays(new Date(), parseISO(user.nextPaymentDate)))
     : 0;
@@ -123,48 +115,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     }
   }, [pathname, user, isAdmin, router]);
 
-  // Usamos useCallback para que 'load' pueda ser una dependencia de useEffect
-  const loadMethods = useCallback(async (mounted: boolean) => {
-    try {
-      const raw = await db.getAll<any>('payment_methods');
-      if (!mounted) return;
-      const mapped = (raw || []).map((it: any) => ({
-        id: it.id,
-        type: it.type === 'qr' ? 'qr' : 'bank',
-        label: it.label || it.name || '',
-        value: it.value || '',
-        qrImage: it.qrImage,
-        holder: it.holder || undefined,
-        cci: it.cci || undefined,
-      }));
-      setPaymentMethods(mapped as PaymentMethod[]);
-    } catch {
-      setPaymentMethods([]);
-    }
-  }, []);
-
   useEffect(() => {
-    let mounted = true;
-    if (!user) {
-      setPaymentMethods([]);
-      return;
-    }
-
-    loadMethods(mounted);
-
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === 'kusko_payment_methods_v1' || e.key === null) {
-        loadMethods(mounted);
-      }
-    };
-
-    window.addEventListener('storage', onStorage);
-
-    return () => {
-      mounted = false;
-      window.removeEventListener('storage', onStorage);
-    };
-  }, [user?.id, loadMethods]);
+    setPaymentMethods([]);
+  }, [user?.id]);
 
   useEffect(() => {
     if (!isOverdue || isAdmin || !user?.id || reminderIntervalMs <= 0) {
@@ -255,15 +208,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     updateUser(updatedUser);
   };
 
-  const handleCopy = async (text: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      toast({ title: 'Copiado', description: 'Datos copiados al portapapeles' });
-    } catch {
-      toast({ variant: 'destructive', title: 'No se pudo copiar', description: 'Permisos denegados o navegador no soportado' });
-    }
-  };
-
   const menuItems = [
     { icon: LayoutDashboard, label: 'Panel Principal', href: '/dashboard', show: true },
     { icon: BarChart3, label: 'Reportes', href: '/admin/reports', show: isAdmin },
@@ -276,7 +220,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     { icon: Activity, label: 'Odontograma', href: '/odontogram', show: !isAdmin && !isSuspended },
     { icon: Calendar, label: 'Citas', href: '/appointments', show: !isAdmin && !isSuspended },
     { icon: Boxes, label: 'Inventario', href: '/inventory', show: !isAdmin && !isSuspended },
-    { icon: Database, label: 'Copia de Seguridad', href: '/backups', show: (isAdmin || isClinic) && !isSuspended },
+   // { icon: Database, label: 'Copia de Seguridad', href: '/backups', show: (isAdmin || isClinic) && !isSuspended },
     { icon: UserIcon, label: 'Mi Perfil', href: '/profile', show: true },
   ];
 
@@ -303,17 +247,24 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         <Sidebar variant="inset" className="border-none shadow-2xl shadow-slate-200/50 dark:shadow-none">
           <SidebarHeader className="p-8 pb-4">
             {user.photo ? (
-              <div className="h-16 w-full flex items-center justify-start overflow-hidden px-2 mb-2">
-                {/* Nota: Se recomienda usar <Image /> de next/image aquí para producción */}
-                <img src={user.photo} className="max-h-full max-w-full object-contain" alt="Logo de la Clínica" />
-              </div>
+              isClinic ? (
+                <div className="h-20 w-full flex items-center justify-start px-2 mb-2">
+                  <div className="h- w- rounded-full overflow-hidden border border-white/60 shadow-md">
+                    <img src={user.photo} className="h-full w-full object-cover" alt="Logo de la Clínica" />
+                  </div>
+                </div>
+              ) : (
+                <div className="h-16 w-full flex items-center justify-start overflow-hidden px-2 mb-2">
+                  <img src={user.photo} className="max-h-full max-w-full object-contain" alt="Logo de la Clínica" />
+                </div>
+              )
             ) : (
               <div className="flex items-center gap-4 px-2 mb-4 group">
                 <div className="w-12 h-12 bg-primary rounded-2xl flex items-center justify-center text-white shadow-lg group-hover:scale-110 transition-transform">
                    <Sparkles className="w-6 h-6" />
                 </div>
                 <div>
-                   <h1 className="text-xl font-black text-primary tracking-tight leading-none uppercase">{user.brandName || 'KuskoDento'}</h1>
+                   <h1 className="text-xl font-black text-primary tracking-tight leading-none uppercase">{user.brandName || user.fullName || 'KuskoDento'}</h1>
                    <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest mt-1">{user.slogan || 'Digital Health'}</p>
                 </div>
               </div>
@@ -334,60 +285,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
-              ))}
+                ))}
             </SidebarMenu>
           </SidebarContent>
-          <div className="mt-auto p-8 border-t bg-slate-50/50 dark:bg-slate-900/20">
-            {!isAdmin && (
-              <div className="mb-6 space-y-4">
-                <div className="p-5 bg-white dark:bg-slate-900 rounded-[1.5rem] border shadow-sm space-y-3">
-                  <div className="flex justify-between items-center">
-                    <p className="text-[10px] uppercase font-black text-muted-foreground tracking-widest leading-none">Status Acceso</p>
-                    <Badge 
-                      variant={currentStatus === 'active' ? 'default' : 'destructive'} 
-                      className={cn(
-                        "text-[9px] h-5 font-black px-2 uppercase tracking-tighter",
-                        isOverdue && "bg-amber-500 hover:bg-amber-600",
-                        currentStatus === 'active' && "bg-emerald-500 hover:bg-emerald-600"
-                      )}
-                    >
-                      {isBlocked ? 'BLOQUEADO' : isSuspended ? 'SUSPENDIDO' : isOverdue ? 'EN MORA' : 'ACTIVO'}
-                    </Badge>
-                  </div>
-                  <div className="space-y-2">
-                    <p className="flex justify-between text-[11px] font-bold">
-                      <span className="text-muted-foreground">ABONO:</span>
-                      <span className="text-primary">S/. {subscriptionFee.toFixed(2)}</span>
-                    </p>
-                    {user.nextPaymentDate && (
-                      <p className="flex justify-between text-[11px] font-bold">
-                        <span className="text-muted-foreground">LÍMITE:</span>
-                        <span className={cn(isOverdue ? "text-amber-600" : "text-slate-600 dark:text-slate-400")}>
-                          {format(parseISO(user.nextPaymentDate), 'dd/MM/yyyy')}
-                        </span>
-                      </p>
-                    )}
-                  </div>
-                </div>
-                <Button 
-                  variant="default" 
-                  size="sm" 
-                  className="w-full h-12 text-[10px] font-black gap-3 shadow-xl shadow-primary/20 rounded-2xl uppercase tracking-widest transition-transform active:scale-95" 
-                  onClick={() => setIsPayModalOpen(true)}
-                >
-                  <Wallet className="w-4 h-4" />
-                  Pagar / Renovar
-                </Button>
-              </div>
-            )}
-            <button 
-              onClick={logout}
-              className="flex items-center gap-4 text-destructive hover:bg-destructive/10 w-full p-4 rounded-2xl transition-colors font-black text-xs uppercase tracking-widest"
-            >
-              <LogOut className="w-5 h-5" />
-              <span>Cerrar Sesión</span>
-            </button>
-          </div>
+        
         </Sidebar>
         <SidebarInset className="bg-transparent">
           <header className="flex h-20 shrink-0 items-center gap-4 border-b bg-white dark:bg-slate-950 px-8">
@@ -441,20 +342,14 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                            <div className="min-w-0 w-full space-y-3">
                              <p className="text-[11px] font-black uppercase text-muted-foreground tracking-widest leading-none">{m.label}</p>
                              <p className="text-xl font-black text-slate-900 dark:text-white break-all leading-tight">{m.value}</p>
-                            {m.qrImage && (
-                              <div
-                                role="button"
-                                tabIndex={0}
-                                onClick={() => { setQrPreview(m.qrImage || null); setIsQrOpen(true); }}
-                                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { setQrPreview(m.qrImage || null); setIsQrOpen(true); } }}
-                                className="mt-6 p-6 bg-white rounded-3xl inline-block shadow-2xl border-4 border-primary/10 cursor-pointer hover:scale-105 transition-transform"
-                              >
-                                <img src={m.qrImage} className="w-64 h-64 object-contain mx-auto" alt="QR de Pago" />
-                                <div className="mt-4 py-3 bg-primary text-white rounded-xl">
-                                  <p className="text-[11px] font-black uppercase tracking-widest">Escanea para pagar</p>
-                                </div>
-                              </div>
-                            )}
+                             {m.qrImage && (
+                               <div className="mt-6 p-6 bg-white rounded-3xl inline-block shadow-2xl border-4 border-primary/10">
+                                 <img src={m.qrImage} className="w-64 h-64 object-contain mx-auto" alt="QR de Pago" />
+                                 <div className="mt-4 py-3 bg-primary text-white rounded-xl">
+                                   <p className="text-[11px] font-black uppercase tracking-widest">Escanea para pagar</p>
+                                 </div>
+                               </div>
+                             )}
                            </div>
                         </div>
                       ))}
@@ -480,102 +375,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             {children}
           </main>
         </SidebarInset>
-        <Dialog open={isPayModalOpen} onOpenChange={setIsPayModalOpen}>
-          <DialogContent className="sm:max-w-4xl rounded-[3.5rem] border-none shadow-[0_35px_60px_-15px_rgba(0,0,0,0.5)] max-h-[90vh] overflow-y-auto scrollbar-hide p-0">
-            <div className="bg-primary h-3" />
-            <div className="p-14 space-y-10">
-              <DialogHeader>
-                <DialogTitle className="flex items-center gap-4 text-3xl font-black tracking-tight">
-                  <div className="p-3 bg-emerald-100 text-emerald-600 rounded-2xl"><Banknote className="w-8 h-8" /></div>
-                  Medios de Pago Autorizados
-                </DialogTitle>
-                <DialogDescription className="text-lg font-bold text-slate-600 dark:text-slate-400 mt-4 leading-relaxed">
-                  Realice su abono mensual para mantener el servicio activo. Luego de pagar, reporte su comprobante para la validación manual.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4">
-                <Accordion type="single" collapsible>
-                  {paymentMethods.map((m) => (
-                      <AccordionItem value={m.id} key={m.id} className="rounded-xl overflow-hidden bg-white/5 dark:bg-slate-900/40 backdrop-blur-sm border border-white/6">
-                      <AccordionTrigger className="px-4">
-                        <div className="flex items-center gap-4 w-full">
-                          <div className="w-12 h-12 rounded-md flex items-center justify-center bg-gradient-to-br from-white/5 to-white/3 text-white">
-                            {m.type === 'qr' ? <QrCode className="w-6 h-6 text-emerald-400" /> : <Building2 className="w-6 h-6 text-sky-400" />}
-                          </div>
-                          <div className="flex-1 text-left">
-                            <div className="text-sm font-black">{m.label}</div>
-                          </div>
-                        </div>
-                      </AccordionTrigger>
-                      <AccordionContent className="px-4">
-                        <div className="py-3 grid grid-cols-1 sm:grid-cols-3 gap-4 items-center">
-                          <div className="sm:col-span-2">
-                            <p className="text-[11px] text-muted-foreground">Número / Cuenta</p>
-                            <div className="mt-1 font-black text-lg break-all text-white">{m.value}</div>
-                            {m.cci && (
-                              <p className="text-[11px] text-muted-foreground mt-2 flex items-center justify-between">
-                                <span>CCI: <span className="font-bold">{m.cci}</span></span>
-                                <button type="button" onClick={() => handleCopy(m.cci || '')} className="ml-4 text-sm px-3 py-2 rounded-lg bg-white/5 hover:bg-white/6">Copiar</button>
-                              </p>
-                            )}
-                            <p className="text-[11px] text-muted-foreground mt-2">Titular: <span className="font-bold">{m.holder || '---'}</span></p>
-                          </div>
-                          <div className="flex sm:justify-end sm:flex-col sm:items-end gap-4">
-                            {m.qrImage ? (
-                              <div className="hidden sm:block">
-                                <img
-                                  src={m.qrImage}
-                                  className="w-56 h-56 object-contain rounded-lg shadow-md cursor-pointer hover:scale-105 transition-transform"
-                                  alt={`${m.label} QR`}
-                                  onClick={() => { setQrPreview(m.qrImage || null); setIsQrOpen(true); }}
-                                />
-                              </div>
-                            ) : null}
-                            <div className="flex sm:justify-end">
-                              <Button variant="ghost" size="sm" onClick={() => handleCopy(m.value)} className="h-12 px-4 rounded-lg bg-white/5 hover:bg-white/6">
-                                <Copy className="w-4 h-4 mr-2" /> Copiar
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                        {m.qrImage && (
-                          <div className="mt-4 sm:hidden">
-                            <img
-                              src={m.qrImage}
-                              className="w-56 h-56 object-contain mx-auto rounded-lg cursor-pointer hover:scale-105 transition-transform"
-                              alt={`${m.label} QR`}
-                              onClick={() => { setQrPreview(m.qrImage || null); setIsQrOpen(true); }}
-                            />
-                          </div>
-                        )}
-                      </AccordionContent>
-                    </AccordionItem>
-                  ))}
-                </Accordion>
-              </div>
-              <div className="pt-10 border-t space-y-8">
-                <p className="text-[11px] font-black text-center text-muted-foreground uppercase tracking-[0.4em]">Reportar Pago vía WhatsApp</p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  <a href="https://wa.me/51929110834" target="_blank" className="h-20 bg-emerald-600 text-white rounded-3xl font-black text-xs flex items-center justify-center gap-4 shadow-xl shadow-emerald-500/20 hover:bg-emerald-700 transition-all active:scale-95 uppercase tracking-widest px-8">
-                     <MessageCircle className="w-8 h-8" /> Soporte Admin 1
-                  </a>
-                  <a href="https://wa.me/51942239654" target="_blank" className="h-20 bg-emerald-600 text-white rounded-3xl font-black text-xs flex items-center justify-center gap-4 shadow-xl shadow-emerald-500/20 hover:bg-emerald-700 transition-all active:scale-95 uppercase tracking-widest px-8">
-                     <MessageCircle className="w-8 h-8" /> Soporte Admin 2
-                  </a>
-                </div>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-        <Dialog open={isQrOpen} onOpenChange={(open) => { setIsQrOpen(open); if (!open) setQrPreview(null); }}>
-          <DialogContent className="sm:max-w-3xl rounded-[2rem] p-4">
-            <div className="p-4 flex items-center justify-center">
-              {qrPreview && (
-                <img src={qrPreview} alt="QR preview" className="w-full h-auto max-h-[80vh] object-contain rounded-lg" />
-              )}
-            </div>
-          </DialogContent>
-        </Dialog>
         <Dialog 
           open={isMoraReminderOpen} 
           onOpenChange={(open) => {
