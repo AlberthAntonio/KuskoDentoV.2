@@ -18,6 +18,13 @@ const optionalCuid = z.preprocess((value) => {
   return trimmed.length > 0 ? trimmed : undefined;
 }, z.string().cuid().optional());
 
+const optionalMinLengthString = (min: number) =>
+  z.preprocess((value) => {
+    if (typeof value !== 'string') return value;
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
+  }, z.string().min(min).optional());
+
 export const LoginSchema = z.object({
   identifier: optionalTrimmedString,
   id: optionalTrimmedString,
@@ -30,22 +37,11 @@ export const LoginSchema = z.object({
   path: ['identifier'],
 });
 
-export const ChangePasswordSchema = z
-  .object({
-    current_password: z.string().min(8),
-    new_password: z.string().min(8),
-    confirm_password: z.string().min(8).optional(),
-  })
-  .refine((data) => (data.confirm_password ? data.new_password === data.confirm_password : true), {
-    message: 'Las contraseñas no coinciden',
-    path: ['confirm_password'],
-  });
-
 export const CreatePatientSchema = z.object({
   dni: z.string().min(5),
   full_name: z.string().min(2),
   phone: z.string().min(6),
-  address: z.string().min(3),
+  address: optionalMinLengthString(3),
   email: optionalEmail,
   first_name: z.string().optional(),
   last_name: z.string().optional(),
@@ -54,7 +50,6 @@ export const CreatePatientSchema = z.object({
   postal_code: z.string().optional(),
   gender: z.string().optional(),
   medical_observations: z.string().optional(),
-  registered_by: optionalCuid,
 });
 
 export const UpdatePatientSchema = CreatePatientSchema.partial();
@@ -63,12 +58,18 @@ export const CreateAppointmentSchema = z.object({
   patient_id: z.string().cuid(),
   doctor_id: z.string().cuid(),
   treatment_id: z.string().cuid().optional(),
-  // Fecha en formato ISO local-date (YYYY-MM-DD). Se normaliza en el servidor.
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato de fecha debe ser YYYY-MM-DD'),
+  date: z.coerce.date(),
   time: z.string().min(4),
   cost: z.number().positive(),
   status: z.string().optional(),
   observations: z.string().optional(),
+  services: z.array(
+    z.object({
+      treatment_id: z.string().cuid(),
+      price: z.number().positive(),
+      observations: z.string().optional(),
+    })
+  ).optional(),
 });
 
 export const CreatePaymentSchema = z.object({

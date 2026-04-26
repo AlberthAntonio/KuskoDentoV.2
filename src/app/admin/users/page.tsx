@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from 'react';
@@ -19,13 +18,14 @@ import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { addMonths, format, parseISO, isValid } from 'date-fns';
-import { subirArchivoExterno } from '@/lib/external-upload';
+import { fetchDniData } from '@/app/api/reniec/api';
 
 type SaveUserPayload = {
   id?: string;
   username?: string;
   password?: string;
   fullName?: string;
+  clinicName?: string;
   dni?: string;
   address?: string;
   colegiatura?: string;
@@ -62,7 +62,6 @@ function UsersContent() {
   const [isOpen, setIsOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-  const [uploadedPhotoUrl, setUploadedPhotoUrl] = useState<string | null>(null);
   const [isValidatingDni, setIsValidatingDni] = useState(false);
   const [isBillingScheduleDirty, setIsBillingScheduleDirty] = useState(false);
   const todayDate = new Date().toISOString().split('T')[0];
@@ -79,6 +78,7 @@ function UsersContent() {
     username: '', 
     password: '', 
     fullName: '', 
+    clinicName: '',
     dni: '', 
     address: '', 
     colegiatura: '',
@@ -109,49 +109,36 @@ function UsersContent() {
     }
 
     setIsValidatingDni(true);
-    // Simulación de validación RENIEC/SUNAT con seguridad
-    setTimeout(() => {
-      setIsValidatingDni(false);
-      const simulatedData: Record<string, string> = {
-        "12345678": "CONSULTORIO DENTAL CUSCO S.A.C.",
-        "87654321": "DR. RICARDO PALMA ZEGARRA",
-        "44556677": "CLINICA ODONTOLOGICA DEL SUR"
-      };
-
-      const foundName = simulatedData[form.dni] || "NOMBRES RECUPERADOS DE RENIEC";
-      setForm(prev => ({ ...prev, fullName: foundName }));
+    try {
+      const data = await fetchDniData(form.dni);
+      // Ajusta el nombre según la estructura de respuesta real de la API
+      const nombre = data?.nombre_completo || data?.nombres || data?.nombre || "NOMBRES RECUPERADOS DE RENIEC";
+      setForm(prev => ({ ...prev, fullName: nombre }));
       toast({ 
         title: "Identidad Validada", 
-        description: "Datos recuperados correctamente de la base de datos oficial." 
+        description: "Datos recuperados correctamente de RENIEC." 
       });
-    }, 1500);
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Error al validar DNI",
+        description: error?.message || "No se pudo obtener datos del DNI."
+      });
+    } finally {
+      setIsValidatingDni(false);
+    }
   };
 
-  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 2 * 1024 * 1024) {
         toast({ variant: "destructive", title: "Archivo demasiado grande", description: "El límite es 2MB." });
         return;
       }
-
-      // Mostrar vista previa inmediata (data URL) mientras sube
       const reader = new FileReader();
       reader.onloadend = () => setPhotoPreview(reader.result as string);
       reader.readAsDataURL(file);
-
-      try {
-        const url = await subirArchivoExterno(file);
-        if (!url) {
-          toast({ variant: 'destructive', title: 'Error al subir', description: 'Respuesta inválida del servidor' });
-          return;
-        }
-
-        setUploadedPhotoUrl(url);
-        setPhotoPreview(url);
-      } catch {
-        toast({ variant: 'destructive', title: 'Error al subir', description: 'No se pudo conectar' });
-      }
     }
   };
 
@@ -160,15 +147,42 @@ function UsersContent() {
     if (!currentUser) return;
 
     const isAdmin = currentUser.role === 'admin';
+    const normalizedDni = form.dni.replace(/\D/g, '');
+    const existingDniUser = isAdmin && !editingId
+      ? users.find((u) => (u.dni || '').replace(/\D/g, '') === normalizedDni)
+      : null;
+
+    if (isAdmin && !editingId && normalizedDni.length < 8) {
+      toast({
+        variant: 'destructive',
+        title: 'DNI/RUC invalido',
+        description: 'Ingrese un DNI o RUC valido para registrar el consultorio.',
+      });
+      return;
+    }
+
+    if (isAdmin && !editingId && existingDniUser) {
+      toast({
+        variant: 'destructive',
+        title: 'DNI duplicado',
+        description: 'El DNI ya esta registrado. Use otro DNI o edite el registro existente.',
+      });
+      return;
+    }
+
+    const resolvedUsername = isAdmin && !editingId
+      ? (form.username.trim() || normalizedDni)
+      : form.username.trim();
 
     const payload: SaveUserPayload = {
-      username: isAdmin ? form.username : undefined,
+      username: isAdmin ? resolvedUsername : undefined,
       password: form.password.trim() || undefined,
-      fullName: form.fullName,
-      dni: form.dni,
+      fullName: form.fullName || undefined,
+      clinicName: isAdmin ? (form.clinicName || undefined) : undefined,
+      dni: normalizedDni,
       address: form.address,
       colegiatura: form.colegiatura,
-      photo: uploadedPhotoUrl || undefined,
+      photo: photoPreview || undefined,
       role: isAdmin ? 'clinic' : form.role,
       subscriptionFee: isAdmin ? (parseFloat(form.subscriptionFee) || 0) : undefined,
       subscriptionStatus: form.subscriptionStatus,
@@ -187,6 +201,23 @@ function UsersContent() {
     }
 
     if (isAdmin && !editingId && payload.password && payload.password.length < 8) {
+          if (isAdmin && !editingId && !payload.clinicName) {
+            toast({
+              variant: 'destructive',
+              title: 'Nombre de la clinica requerido',
+              description: 'Ingrese el nombre de la clinica para continuar.',
+            });
+            return;
+          }
+
+          if (isAdmin && !editingId && !payload.username) {
+            toast({
+              variant: 'destructive',
+              title: 'DNI/RUC requerido',
+              description: 'El usuario se genera con DNI/RUC. Complete el campo.',
+            });
+            return;
+          }
       toast({
         variant: 'destructive',
         title: 'Clave invalida',
@@ -200,10 +231,14 @@ function UsersContent() {
       : await createUserMutation.mutate(payload);
 
     if (!saved) {
+      const saveError = updateUserMutation.error || createUserMutation.error || '';
+      const friendlyError = saveError.includes('User_dni_key') || saveError.includes('Unique constraint failed')
+        ? 'El DNI ya esta registrado. Use otro DNI o edite el registro existente.'
+        : saveError || 'Intente nuevamente';
       toast({
         variant: 'destructive',
         title: 'No se pudo guardar',
-        description: updateUserMutation.error || createUserMutation.error || 'Intente nuevamente',
+        description: friendlyError,
       });
       return;
     }
@@ -230,12 +265,12 @@ function UsersContent() {
   const resetForm = () => {
     setEditingId(null);
     setPhotoPreview(null);
-    setUploadedPhotoUrl(null);
     setIsBillingScheduleDirty(false);
     setForm({ 
       username: '', 
       password: '', 
       fullName: '', 
+      clinicName: '',
       dni: '', 
       address: '', 
       colegiatura: '',
@@ -267,12 +302,14 @@ function UsersContent() {
   };
 
   const openEdit = (u: AdminUser) => {
+    const isAdmin = currentUser?.role === 'admin';
     setEditingId(u.id);
     setIsBillingScheduleDirty(false);
     setForm({ 
       username: u.username || '', 
       password: '', 
-      fullName: u.fullName || '', 
+      fullName: isAdmin ? (u.ownerName || '') : (u.fullName || ''), 
+      clinicName: isAdmin ? (u.fullName || '') : '',
       dni: u.dni || '', 
       address: u.address || '', 
       colegiatura: u.colegiatura || '',
@@ -285,7 +322,6 @@ function UsersContent() {
       subscriptionStatus: u.subscriptionStatus
     });
     setPhotoPreview(u.photo || null);
-    setUploadedPhotoUrl(u.photo || null);
     setIsOpen(true);
   };
 
@@ -351,7 +387,7 @@ function UsersContent() {
                 <div className="flex justify-center">
                   <div className="relative group">
                     <Avatar className="w-32 h-32 border-4 border-white dark:border-slate-800 shadow-2xl ring-4 ring-primary/10 transition-transform group-hover:scale-105">
-                      <AvatarImage src={photoPreview || ''} className="object-cover" />
+                      <AvatarImage src={photoPreview || undefined} className="object-cover" />
                       <AvatarFallback className="bg-slate-50 text-primary text-4xl font-black">
                         {isAdmin ? <Building2 className="w-14 h-14" /> : <UserIcon className="w-14 h-14" />}
                       </AvatarFallback>
@@ -371,7 +407,21 @@ function UsersContent() {
                     <div className="flex gap-3">
                       <div className="relative flex-1">
                         <Search className="absolute left-4 top-3.5 w-5 h-5 text-muted-foreground" />
-                        <Input id="dni" value={form.dni} onChange={e => setForm({...form, dni: e.target.value.replace(/\D/g, '').slice(0, 11)})} maxLength={11} className={cn("pl-12", fieldClassName)} placeholder="45678901" />
+                        <Input
+                          id="dni"
+                          value={form.dni}
+                          onChange={(e) => {
+                            const value = e.target.value.replace(/\D/g, '').slice(0, 11);
+                            setForm((prev) => ({
+                              ...prev,
+                              dni: value,
+                              username: isAdmin && !editingId ? value : prev.username,
+                            }));
+                          }}
+                          maxLength={11}
+                          className={cn("pl-12", fieldClassName)}
+                          placeholder="45678901"
+                        />
                       </div>
                       <Button 
                         type="button" 
@@ -386,18 +436,41 @@ function UsersContent() {
                     </div>
                   </div>
 
+                  {isAdmin && (
+                    <div className="space-y-3 col-span-1">
+                      <Label htmlFor="clinicName" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                        Nombre de la Clinica
+                      </Label>
+                      <Input
+                        id="clinicName"
+                        value={form.clinicName}
+                        onChange={e => setForm({ ...form, clinicName: e.target.value })}
+                        required
+                        className={cn(strongFieldClassName, "text-primary dark:text-primary")}
+                        placeholder="Ej: Clinica Dental Sonrisa"
+                      />
+                    </div>
+                  )}
+
                   <div className="space-y-3 col-span-1">
                     <Label htmlFor="fullName" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                      {isAdmin ? 'Nombre Comercial / Razón Social' : 'Nombre Completo del Personal'}
+                      {isAdmin ? 'Nombre del Responsable' : 'Nombre Completo del Personal'}
                     </Label>
-                    <Input id="fullName" value={form.fullName} onChange={e => setForm({...form, fullName: e.target.value})} required className={cn(strongFieldClassName, "text-primary dark:text-primary") } placeholder="Se completará automáticamente" />
+                    <Input id="fullName" value={form.fullName} onChange={e => setForm({...form, fullName: e.target.value})} className={cn(strongFieldClassName, "text-primary dark:text-primary") } placeholder={isAdmin ? 'Ej: Juan Perez' : 'Se completará automáticamente'} />
                   </div>
                   
                   {isAdmin && (
                     <>
                       <div className="space-y-3">
-                        <Label htmlFor="username" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">ID de Usuario</Label>
-                        <Input id="username" value={form.username} onChange={e => setForm({...form, username: e.target.value})} required={isAdmin && !editingId} className={fieldClassName} />
+                        <Label htmlFor="username" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Usuario (DNI/RUC)</Label>
+                        <Input
+                          id="username"
+                          value={form.username}
+                          onChange={e => setForm({...form, username: e.target.value})}
+                          readOnly={isAdmin && !editingId}
+                          className={fieldClassName}
+                          placeholder="Se genera automaticamente"
+                        />
                       </div>
                       <div className="space-y-3">
                         <Label htmlFor="password" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Clave de Seguridad</Label>
@@ -543,13 +616,18 @@ function UsersContent() {
                <div className={cn("h-3 w-full", u.subscriptionStatus === 'active' ? 'bg-emerald-500' : u.subscriptionStatus === 'suspended' ? 'bg-amber-500' : 'bg-red-600')} />
                <CardHeader className="flex flex-row items-start gap-5 p-8 pb-4">
                  <Avatar className="w-20 h-20 rounded-3xl shadow-xl ring-4 ring-white dark:ring-slate-900">
-                   <AvatarImage src={u.photo} className="object-cover" />
+                   <AvatarImage src={u.photo || undefined} className="object-cover" />
                    <AvatarFallback className="bg-primary/5 text-primary">
                      {u.role === 'clinic' ? <Building2 className="w-10 h-10" /> : u.role === 'doctor' ? <Stethoscope className="w-10 h-10" /> : <Briefcase className="w-10 h-10" />}
                    </AvatarFallback>
                  </Avatar>
                  <div className="flex-1 min-w-0">
                    <CardTitle className="text-xl truncate font-black text-slate-800 dark:text-white leading-tight">{u.fullName || u.username}</CardTitle>
+                  {isAdmin && (
+                    <p className="text-[10px] uppercase font-bold text-muted-foreground mt-1">
+                      Responsable: {u.ownerName || u.username || 'Sin asignar'}
+                    </p>
+                  )}
                    <CardDescription className="flex items-center gap-2 mt-2 font-black text-primary uppercase text-[10px] tracking-widest bg-primary/5 w-fit px-3 py-1 rounded-full">
                      <Shield className="w-3 h-3" /> {
                        u.role === 'clinic' ? 'Consultorio' : 
@@ -584,6 +662,18 @@ function UsersContent() {
                    </div>
                  )}
                  <div className="text-sm space-y-3 text-muted-foreground">
+                     {isAdmin && (
+                       <p className="flex items-center gap-3 font-bold">
+                         <UserIcon className="w-4 h-4 text-primary" />
+                         <span>Responsable: {u.ownerName || u.username || 'Sin asignar'}</span>
+                       </p>
+                     )}
+                     {isAdmin && u.dni && (
+                       <p className="flex items-center gap-3 font-bold">
+                         <Shield className="w-4 h-4 text-primary" />
+                         <span>DNI: {u.dni}</span>
+                       </p>
+                     )}
                     <p className="flex items-center gap-3 font-bold"><MapPin className="w-4 h-4 text-primary" /> <span className="truncate">{u.address || 'Ubicación no registrada'}</span></p>
                     {u.colegiatura && <p className="flex items-center gap-3 font-bold"><Stethoscope className="w-4 h-4 text-primary" /> <span>Reg: {u.colegiatura}</span></p>}
                  </div>

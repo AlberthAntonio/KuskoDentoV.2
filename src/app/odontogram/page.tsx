@@ -9,10 +9,12 @@ import { Search, UserSquare2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useState, useEffect } from 'react';
 import { db, Patient } from '@/lib/legacy-data';
+import { useFocus } from '@/hooks/use-focus';
 import Link from 'next/link';
 
 function OdontogramContent() {
   const { user } = useAuth();
+  const { focusMode, activePatientId } = useFocus();
   const [patients, setPatients] = useState<Patient[]>([]);
   const [search, setSearch] = useState('');
 
@@ -24,9 +26,12 @@ function OdontogramContent() {
     }
   }, [user]);
 
-  const filtered = patients.filter(p => 
-    p.dni.includes(search) || p.names.toLowerCase().includes(search.toLowerCase()) || p.lastNames.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = patients.filter(p => {
+    if (focusMode && activePatientId) {
+      return p.id === activePatientId;
+    }
+    return p.dni.includes(search) || p.names.toLowerCase().includes(search.toLowerCase()) || p.lastNames.toLowerCase().includes(search.toLowerCase());
+  });
 
   return (
     <AppLayout>

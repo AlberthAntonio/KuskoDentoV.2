@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { format, parseISO, isValid } from 'date-fns';
+import { useFocus } from '@/hooks/use-focus';
 import { cn } from '@/lib/utils';
 
 const PAGE_SIZE = 10;
@@ -46,6 +47,11 @@ type ApiPayment = {
     status: string;
     cost?: string | number;
     treatment?: { id: string; name: string } | null;
+    appointment_treatments?: Array<{
+      treatment?: { id: string; name: string } | null;
+      price: string | number;
+      observations?: string | null;
+    }>;
   };
   payment_histories?: ApiPaymentHistory[];
 };
@@ -62,6 +68,11 @@ type ApiAppointment = {
     dni: string;
   };
   treatment?: { id: string; name: string } | null;
+  appointment_treatments?: Array<{
+    treatment?: { id: string; name: string } | null;
+    price: string | number;
+    observations?: string | null;
+  }>;
 };
 
 type ApiResponse<T> = {
@@ -110,8 +121,19 @@ function toNumber(v: string | number | undefined | null) {
   return Number(v || 0);
 }
 
+function resolveAppointmentTreatments(appointment?: ApiPayment['appointment']) {
+  const services = appointment?.appointment_treatments
+    ?.map((item) => item.treatment?.name || '')
+    .filter((name) => Boolean(name));
+
+  if (services && services.length > 0) return services;
+  const fallback = appointment?.treatment?.name;
+  return [fallback || 'Consulta'];
+}
+
 function PaymentsContent() {
   const { toast } = useToast();
+  const { focusMode, activePatientId } = useFocus();
   const [payments, setPayments] = useState<ApiPayment[]>([]);
   const [search, setSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -179,6 +201,7 @@ function PaymentsContent() {
               status: appt.status,
               cost: appt.cost,
               treatment: appt.treatment,
+              appointment_treatments: appt.appointment_treatments,
             },
             payment_histories: [],
           };
@@ -268,8 +291,12 @@ function PaymentsContent() {
   const filtered = useMemo(
     () =>
       payments.filter((p) => {
+        if (focusMode && activePatientId) {
+          return p.patient?.id === activePatientId;
+        }
+
         const patientName = p.patient?.full_name || '';
-        const treatmentName = p.appointment?.treatment?.name || 'Consulta';
+        const treatmentName = resolveAppointmentTreatments(p.appointment).join(' ');
         const patientDni = p.patient?.dni || '';
 
         return (
@@ -278,14 +305,24 @@ function PaymentsContent() {
           patientDni.includes(search)
         );
       }),
-    [payments, search]
+    [payments, search, focusMode, activePatientId]
   );
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const paginatedData = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const pendingFiltered = useMemo(
+    () => filtered.filter((p) => toNumber(p.balance) > 0),
+    [filtered]
+  );
+
+  const paidFiltered = useMemo(
+    () => filtered.filter((p) => toNumber(p.balance) <= 0),
+    [filtered]
+  );
+
+  const totalPages = Math.max(1, Math.ceil(pendingFiltered.length / PAGE_SIZE));
+  const paginatedData = pendingFiltered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   const totalRecaudado = payments.reduce((acc, curr) => acc + toNumber(curr.total_paid), 0);
-  const totalSaldos = payments.reduce((acc, curr) => acc + toNumber(curr.balance), 0);
+  const totalSaldos = pendingFiltered.reduce((acc, curr) => acc + toNumber(curr.balance), 0);
 
   return (
     <AppLayout>
@@ -319,7 +356,7 @@ function PaymentsContent() {
               <CardTitle className="text-xs font-bold uppercase text-slate-600">Operaciones</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-slate-600">{payments.length}</div>
+              <div className="text-2xl font-bold text-slate-600">{pendingFiltered.length}</div>
             </CardContent>
           </Card>
         </div>
@@ -360,7 +397,8 @@ function PaymentsContent() {
                   const balance = toNumber(p.balance);
                   const patientName = p.patient?.full_name || 'Desconocido';
                   const patientDni = p.patient?.dni || '';
-                  const treatmentName = p.appointment?.treatment?.name || 'Consulta';
+                  const treatmentNames = resolveAppointmentTreatments(p.appointment);
+                  const treatmentLabel = treatmentNames.join(', ');
 
                   return (
                     <TableRow key={p.id}>
@@ -369,7 +407,7 @@ function PaymentsContent() {
                         <div className="text-[10px] text-muted-foreground">DNI: {patientDni}</div>
                       </TableCell>
                       <TableCell>
-                        <div className="font-medium text-[11px] uppercase truncate max-w-[150px]">{treatmentName}</div>
+                        <div className="font-medium text-[11px] uppercase truncate max-w-[150px]">{treatmentLabel}</div>
                         <div className="text-[10px] text-muted-foreground">{safeFormatDate(p.created_at)}</div>
                       </TableCell>
                       <TableCell className="text-sm">S/. {totalCost.toFixed(2)}</TableCell>
@@ -406,8 +444,8 @@ function PaymentsContent() {
                 {paginatedData.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                      {payments.length === 0
-                        ? 'No hay pagos ni citas atendidas pendientes por cobrar'
+                      {pendingFiltered.length === 0
+                        ? 'No hay pagos pendientes por cobrar'
                         : 'No hay resultados que coincidan con tu búsqueda'}
                     </TableCell>
                   </TableRow>
@@ -441,6 +479,64 @@ function PaymentsContent() {
           )}
         </Card>
 
+        <Card className="p-6 border-none shadow-sm">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-lg font-bold">Historial de Pagos</h3>
+            <span className="text-xs text-muted-foreground">Pagos liquidados</span>
+          </div>
+          <div className="border rounded-xl overflow-hidden shadow-sm">
+            <Table>
+              <TableHeader className="bg-muted/50">
+                <TableRow>
+                  <TableHead>Paciente</TableHead>
+                  <TableHead>Tratamiento</TableHead>
+                  <TableHead>Presupuesto</TableHead>
+                  <TableHead>Pagado</TableHead>
+                  <TableHead>Saldo</TableHead>
+                  <TableHead>Estado</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {paidFiltered.map((p) => {
+                  const totalCost = toNumber(p.total_cost);
+                  const totalPaid = toNumber(p.total_paid);
+                  const balance = toNumber(p.balance);
+                  const patientName = p.patient?.full_name || 'Desconocido';
+                  const patientDni = p.patient?.dni || '';
+                  const treatmentNames = resolveAppointmentTreatments(p.appointment);
+                  const treatmentLabel = treatmentNames.join(', ');
+
+                  return (
+                    <TableRow key={p.id}>
+                      <TableCell>
+                        <div className="font-bold text-sm">{patientName}</div>
+                        <div className="text-[10px] text-muted-foreground">DNI: {patientDni}</div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="font-medium text-[11px] uppercase truncate max-w-[150px]">{treatmentLabel}</div>
+                        <div className="text-[10px] text-muted-foreground">{safeFormatDate(p.created_at)}</div>
+                      </TableCell>
+                      <TableCell className="text-sm">S/. {totalCost.toFixed(2)}</TableCell>
+                      <TableCell className="font-bold text-emerald-600 text-sm">S/. {totalPaid.toFixed(2)}</TableCell>
+                      <TableCell className="font-bold text-sm">S/. {balance.toFixed(2)}</TableCell>
+                      <TableCell>
+                        <Badge variant="default" className="bg-emerald-500">LIQUIDADO</Badge>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+                {paidFiltered.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                      No hay pagos liquidados
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </Card>
+
         <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
@@ -455,7 +551,7 @@ function PaymentsContent() {
                     Paciente: <b className="text-primary">{editingPayment.patient?.full_name || 'Desconocido'}</b>
                   </p>
                   <p className="text-xs">
-                    Procedimiento: <b>{editingPayment.appointment?.treatment?.name || 'Consulta'}</b>
+                    Procedimiento: <b>{resolveAppointmentTreatments(editingPayment.appointment).join(', ')}</b>
                   </p>
                   <p className="text-xs">
                     Saldo pendiente:{' '}

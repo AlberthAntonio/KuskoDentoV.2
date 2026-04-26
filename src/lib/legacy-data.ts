@@ -152,6 +152,12 @@ export interface Appointment {
   cost: number;
   clinicId?: string;
   observations?: string;
+  treatmentName?: string;
+  services?: Array<{
+    name: string;
+    cost: number;
+    observations?: string | null;
+  }>;
 }
 
 export interface Payment {
@@ -264,7 +270,7 @@ export interface PaymentMethod {
 }
 
 export const db = {
-  async getAll<T = unknown>(table: string, patientId?: string): Promise<T[]> {
+  async getAll<T = unknown>(table: string): Promise<T[]> {
     try {
       if (table === 'payments') {
         const data = await apiGet<{ items?: Array<{
@@ -455,7 +461,6 @@ export const db = {
       }
 
       if (table === 'radiographs') {
-        const url = patientId ? `/api/radiographs?patient_id=${patientId}` : '/api/radiographs';
         const data = await apiGet<{ items?: Array<{
           id: string;
           patient_id: string;
@@ -466,7 +471,7 @@ export const db = {
           type?: string | null;
           created_at: string;
           clinic_id: string;
-        }> }>(url);
+        }> }>('/api/radiographs');
 
         const items = (data.items || []).map((item) => ({
           id: item.id,
@@ -476,6 +481,7 @@ export const db = {
           type: item.type || undefined,
           clinicId: item.clinic_id,
           date: toDate(item.created_at),
+          fileBlob: dataUrlToBlob(item.file_url, item.mime_type || 'image/*'),
           fileType: item.mime_type || 'image/*',
           fileName: item.file_name,
         }));
@@ -573,9 +579,7 @@ export const db = {
       data: {},
     });
   },
-  async importData(data: unknown): Promise<void> {
-    void data;
-  },
+  async importData(_data: unknown): Promise<void> {},
   put: async (tableOrData: string | unknown, maybeData?: unknown): Promise<null> => {
     const table = typeof tableOrData === 'string' ? tableOrData : undefined;
     const payload = (typeof tableOrData === 'string' ? maybeData : tableOrData) as Record<string, unknown> | undefined;

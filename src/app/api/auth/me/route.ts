@@ -12,6 +12,10 @@ export async function GET() {
     const data = await authService.me(userId, clinicId);
     return apiOk(data);
   } catch (error) {
+    if (error instanceof Error && error.message === 'Usuario no encontrado') {
+      return apiError('No autorizado', 401);
+    }
+
     return apiErrorFromUnknown(error, 500, 'api/auth/me#get');
   }
 }

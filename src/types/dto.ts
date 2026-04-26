@@ -80,6 +80,15 @@ export interface AppointmentCalendarDTO {
     name: string;
     price: unknown;
   } | null;
+  appointment_treatments: Array<{
+    treatment: {
+      id: string;
+      name: string;
+      price: unknown;
+    } | null;
+    price: unknown;
+    observations: string | null;
+  }>;
 }
 
 export interface AppointmentBillingDTO {
@@ -107,4 +116,13 @@ export interface AppointmentBillingDTO {
     name: string;
     price: unknown;
   } | null;
+  appointment_treatments: Array<{
+    treatment: {
+      id: string;
+      name: string;
+      price: unknown;
+    } | null;
+    price: unknown;
+    observations: string | null;
+  }>;
 }
