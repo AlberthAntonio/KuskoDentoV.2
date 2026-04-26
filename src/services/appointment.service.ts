@@ -97,6 +97,7 @@ export const appointmentService = {
     cost: number;
     status?: string;
     observations?: string;
+    duration_minutes?: number;
     services?: Array<{
       treatment_id: string;
       price: number;
@@ -117,6 +118,7 @@ export const appointmentService = {
           cost: new Prisma.Decimal(data.cost),
           status: data.status || 'scheduled',
           observations: data.observations,
+          duration_minutes: data.duration_minutes,
         },
       });
 
@@ -136,7 +138,7 @@ export const appointmentService = {
     });
   },
 
-  async updateStatus(clinicId: string, id: string, status: string) {
+  async updateStatus(clinicId: string, id: string, status: string, duration_minutes?: number) {
     const current = await prisma.appointment.findFirst({ where: { id, clinic_id: clinicId } });
     if (!current) {
       throw new Error('Cita no encontrada');
@@ -144,7 +146,10 @@ export const appointmentService = {
 
     return prisma.appointment.update({
       where: { id },
-      data: { status },
+      data: { 
+        status,
+        ...(duration_minutes !== undefined ? { duration_minutes } : {})
+      },
     });
   },
 
@@ -157,6 +162,7 @@ export const appointmentService = {
     cost?: number;
     status?: string;
     observations?: string;
+    duration_minutes?: number;
     services?: Array<{
       treatment_id: string;
       price: number;
@@ -180,6 +186,7 @@ export const appointmentService = {
           ...(data.cost !== undefined ? { cost: new Prisma.Decimal(data.cost) } : {}),
           ...(data.status ? { status: data.status } : {}),
           ...(data.observations !== undefined ? { observations: data.observations } : {}),
+          ...(data.duration_minutes !== undefined ? { duration_minutes: data.duration_minutes } : {}),
         },
       });
 

@@ -38,6 +38,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         cost: typeof body.cost === 'number' ? body.cost : undefined,
         status: typeof body.status === 'string' ? body.status : undefined,
         observations: typeof body.observations === 'string' ? body.observations : undefined,
+        duration_minutes: typeof body.duration_minutes === 'number' ? body.duration_minutes : undefined,
         services: Array.isArray(body.services) ? body.services : undefined,
       });
       return apiOk(updated);
@@ -47,7 +48,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const status = typeof body?.status === 'string' ? body.status : '';
     if (!status) return apiError('Estado invalido', 400);
 
-    const updated = await appointmentService.updateStatus(clinicId, id, status);
+    const duration_minutes = typeof body.duration_minutes === 'number' ? body.duration_minutes : undefined;
+    const updated = await appointmentService.updateStatus(clinicId, id, status, duration_minutes);
     return apiOk(updated);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Error interno';

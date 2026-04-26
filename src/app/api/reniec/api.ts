@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_TOKEN = 'ddd11e7aa5cc56a6c8a1f60c0aee35085ca826ea61594ebcdd706c4f1572ea2a';
+const API_TOKEN = 'pon el token aquí';
 const BASE_URL = 'https://apiperu.dev/api';
 
 const fetchData = async (endpoint) => {
