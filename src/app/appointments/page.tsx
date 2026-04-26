@@ -360,18 +360,25 @@ function AppointmentsContent() {
     }
   };
 
-  const updateStatus = async (appointmentId: string, newStatus: 'Asignado' | 'Atendido') => {
+  const updateStatus = async (appointmentId: string, newStatus: 'Asignado' | 'Atendido', duration_minutes?: number) => {
     try {
       await apiRequest(`/api/appointments/${appointmentId}`, {
         method: 'PATCH',
-        body: JSON.stringify({ status: mapStatusToApi(newStatus) }),
+        body: JSON.stringify({ 
+          status: mapStatusToApi(newStatus),
+          ...(duration_minutes !== undefined ? { duration_minutes } : {})
+        }),
       });
       load();
     } catch (error) { toast({ variant: 'destructive', title: 'Error al actualizar estado' }); }
   };
 
   const handleStartAttention = (id: string, patientId: string) => { startFocus(id, patientId); };
-  const handleFinishAttention = async (id: string) => { await updateStatus(id, 'Atendido'); stopFocus(); };
+  const handleFinishAttention = async (id: string) => { 
+    const duration = Math.ceil(elapsedSeconds / 60);
+    await updateStatus(id, 'Atendido', duration); 
+    stopFocus(); 
+  };
   const handleDeleteRequest = (id: string) => { setAppointmentToDelete(id); setConfirmWord(''); setIsDeleteOpen(true); };
 
   const confirmDelete = async () => {

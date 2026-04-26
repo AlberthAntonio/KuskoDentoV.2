@@ -7,7 +7,7 @@ CREATE TABLE `Clinic` (
     `email` VARCHAR(191) NULL,
     `address` VARCHAR(191) NULL,
     `logo_url` VARCHAR(191) NULL,
-    `slogan` VARCHAR(191) NULL;
+    `slogan` VARCHAR(191) NULL,
     `primary_color` VARCHAR(191) NULL,
     `theme` VARCHAR(191) NOT NULL DEFAULT 'light',
     `subscription_status` VARCHAR(191) NOT NULL DEFAULT 'active',
