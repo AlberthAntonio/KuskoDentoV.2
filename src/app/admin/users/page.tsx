@@ -58,7 +58,7 @@ function UsersContent() {
     { clinicId: string; amount: number; installments: number; nextPaymentDate: string; concept: string }
   >('/api/admin/subscription-payments', 'POST');
 
-  const users = usersData?.items ?? [];
+  const users = (usersData?.items ?? []).filter(u => currentUser?.role === 'admin' || u.role !== 'clinic');
   const [isOpen, setIsOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
