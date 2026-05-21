@@ -14,7 +14,7 @@ CREATE TABLE `Clinic` (
     `subscription_tier` VARCHAR(191) NOT NULL DEFAULT 'basic',
     `next_payment_date` DATETIME(3) NULL,
     `contract_start_date` DATETIME(3) NULL,
-    `subscription_fee` DECIMAL(10, 2) NOT NULL DEFAULT 50.00;
+    `subscription_fee` DECIMAL(10, 2) NOT NULL DEFAULT 50.00,
     `created_by` VARCHAR(191) NULL,
     `created_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updated_at` DATETIME(3) NOT NULL,
