@@ -147,6 +147,31 @@ function UsersContent() {
     e.preventDefault();
     if (!currentUser) return;
 
+    let photoUrl: string | undefined;
+    if (photoPreview && photoPreview.startsWith('data:')) {
+      try {
+        const blob = await (await fetch(photoPreview)).blob();
+        const formData = new FormData();
+        formData.append('file', blob, 'photo.jpg');
+
+        const uploadRes = await fetch('/api/admin/upload-photo', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (uploadRes.ok) {
+          const uploadData = await uploadRes.json();
+          photoUrl = uploadData.data?.url;
+        }
+      } catch (error) {
+        toast({
+          variant: 'destructive',
+          title: 'Error al subir foto',
+          description: error instanceof Error ? error.message : 'No se pudo subir la foto',
+        });
+      }
+    }
+
     const isAdmin = currentUser.role === 'admin';
     const normalizedDni = form.dni.replace(/\D/g, '');
     const existingDniUser = isAdmin && !editingId
@@ -183,7 +208,7 @@ function UsersContent() {
       dni: normalizedDni,
       address: form.address,
       colegiatura: form.colegiatura,
-      photo: photoPreview || undefined,
+      photo: photoUrl || undefined,
       role: isAdmin ? 'clinic' : form.role,
       subscriptionFee: isAdmin ? (parseFloat(form.subscriptionFee) || 0) : undefined,
       subscriptionStatus: form.subscriptionStatus,
@@ -617,7 +642,7 @@ function UsersContent() {
                <div className={cn("h-3 w-full", u.subscriptionStatus === 'active' ? 'bg-emerald-500' : u.subscriptionStatus === 'suspended' ? 'bg-amber-500' : 'bg-red-600')} />
                <CardHeader className="flex flex-row items-start gap-5 p-8 pb-4">
                  <Avatar className="w-20 h-20 rounded-3xl shadow-xl ring-4 ring-white dark:ring-slate-900">
-                   <AvatarImage src={u.photo || undefined} className="object-cover" />
+                   <AvatarImage src={u.photo && !u.photo.startsWith('data:') ? (u.photo.includes('api.cuscodento.com') ? `/api/files/download?path=${encodeURIComponent(u.photo.split('https://api.cuscodento.com/')[1])}` : u.photo) : u.photo || undefined} className="object-cover" />
                    <AvatarFallback className="bg-primary/5 text-primary">
                      {u.role === 'clinic' ? <Building2 className="w-10 h-10" /> : u.role === 'doctor' ? <Stethoscope className="w-10 h-10" /> : <Briefcase className="w-10 h-10" />}
                    </AvatarFallback>
