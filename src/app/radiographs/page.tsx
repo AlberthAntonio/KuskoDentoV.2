@@ -19,6 +19,16 @@ function RadiographsContent() {
     load();
   }, []);
 
+  const getProxyUrl = (fileUrl: string): string => {
+    try {
+      const url = new URL(fileUrl);
+      const path = url.pathname.replace(/^\//, '');
+      return `/api/files/download?path=${encodeURIComponent(path)}`;
+    } catch {
+      return fileUrl;
+    }
+  };
+
   const load = async () => {
     const allR = await db.getAll<Radiograph>('radiographs');
     const allP = await db.getAll<Patient>('patients');
@@ -56,10 +66,10 @@ function RadiographsContent() {
 
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
             {filtered.map(r => (
-              <Card key={r.id} className="overflow-hidden group border-none shadow-sm hover:shadow-md transition-all cursor-pointer" onClick={() => setZoomedImage(r.fileUrl)}>
+              <Card key={r.id} className="overflow-hidden group border-none shadow-sm hover:shadow-md transition-all cursor-pointer" onClick={() => setZoomedImage(getProxyUrl(r.fileUrl))}>
                 <div className="aspect-square bg-slate-900 relative flex items-center justify-center overflow-hidden">
                   <img
-                    src={r.fileUrl}
+                    src={getProxyUrl(r.fileUrl)}
                     className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-all group-hover:scale-110"
                     alt={r.fileName}
                   />
@@ -92,7 +102,7 @@ function RadiographsContent() {
               <X className="w-8 h-8" />
             </Button>
             {zoomedImage && (
-              <img src={zoomedImage} className="max-w-full max-h-full object-contain shadow-2xl" alt="Zoom" />
+              <img src={zoomedImage} className="max-w-full max-h-full object-contain shadow-2xl" alt="Zoom radiografía" />
             )}
           </DialogContent>
         </Dialog>

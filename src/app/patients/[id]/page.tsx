@@ -389,16 +389,28 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
     e.target.value = ''; 
   };
 
+  const getProxyUrl = (fileUrl: string): string => {
+    try {
+      const url = new URL(fileUrl);
+      const path = url.pathname.replace(/^\//, '');
+      return `/api/files/download?path=${encodeURIComponent(path)}`;
+    } catch {
+      return fileUrl;
+    }
+  };
+
   const downloadFile = (fileUrl: string, fileName: string) => {
+    const proxyUrl = getProxyUrl(fileUrl);
     const a = document.createElement('a');
-    a.href = fileUrl;
+    a.href = proxyUrl;
     a.download = fileName;
     a.target = '_blank';
     a.click();
   };
 
   const openPreview = (fileUrl: string, fileType: string) => {
-    setPreviewData({ url: fileUrl, type: fileType });
+    const proxyUrl = getProxyUrl(fileUrl);
+    setPreviewData({ url: proxyUrl, type: fileType });
   };
 
   const deleteFile = async (store: 'radiographs' | 'consents', fileId: string) => {
@@ -680,7 +692,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
                      <Card key={r.id} className="overflow-hidden group relative border-none shadow-sm hover:shadow-md transition-all">
                        <div className="aspect-square bg-slate-100 flex items-center justify-center overflow-hidden cursor-pointer" onClick={() => openPreview(r.fileUrl, r.fileType)}>
                           <img
-                            src={r.fileUrl}
+                            src={getProxyUrl(r.fileUrl)}
                             className="w-full h-full object-cover transition-transform group-hover:scale-105"
                             alt={r.fileName}
                           />
