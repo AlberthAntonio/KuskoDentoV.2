@@ -29,14 +29,18 @@ export async function POST(request: Request) {
       body: hostingerForm,
     });
 
+    const data = (await hostingerRes.json().catch(() => null)) as
+      | { success: boolean; url?: string; error?: string }
+      | null;
+
     if (!hostingerRes.ok) {
-      return apiError(`Error del servidor de archivos (${hostingerRes.status})`, 502);
+      const status = hostingerRes.status === 413 ? 413 : 502;
+      const msg = data?.error || `Error del servidor de archivos (${hostingerRes.status})`;
+      return apiError(msg, status);
     }
 
-    const data = (await hostingerRes.json()) as { success: boolean; url?: string; error?: string };
-
-    if (!data.success || !data.url) {
-      return apiError(data.error || 'El servidor no devolvio una URL valida', 502);
+    if (!data || !data.success || !data.url) {
+      return apiError(data?.error || 'El servidor no devolvio una URL valida', 502);
     }
 
     return apiOk({ url: data.url });
