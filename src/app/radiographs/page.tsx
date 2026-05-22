@@ -9,6 +9,7 @@ import { Search, Image as ImageIcon, ZoomIn, Calendar, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { getProxyUrl } from '@/lib/file-url';
 
 function RadiographsContent() {
   const [radiographs, setRadiographs] = useState<any[]>([]);
@@ -18,16 +19,6 @@ function RadiographsContent() {
   useEffect(() => {
     load();
   }, []);
-
-  const getProxyUrl = (fileUrl: string): string => {
-    try {
-      const url = new URL(fileUrl);
-      const path = url.pathname.replace(/^\//, '');
-      return `/api/files/download?path=${encodeURIComponent(path)}`;
-    } catch {
-      return fileUrl;
-    }
-  };
 
   const load = async () => {
     const allR = await db.getAll<Radiograph>('radiographs');

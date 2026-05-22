@@ -1,22 +1,35 @@
+export const MAX_UPLOAD_BYTES = 2 * 1024 * 1024;
+
+type ApiEnvelope<T> = {
+  success?: boolean;
+  data?: T;
+  error?: string;
+};
+
 export async function uploadToHostinger(file: File): Promise<string> {
+  if (file.size > MAX_UPLOAD_BYTES) {
+    throw new Error('El archivo supera el limite de 2MB');
+  }
+
   const formData = new FormData();
   formData.append('archivo', file);
 
   const response = await fetch('/api/upload', {
     method: 'POST',
     body: formData,
+    credentials: 'include',
   });
 
+  const body = (await response.json().catch(() => ({}))) as ApiEnvelope<{ url?: string }> & { url?: string; error?: string };
+
   if (!response.ok) {
-    const body = (await response.json().catch(() => ({}))) as { error?: string };
     throw new Error(body.error || `Error al subir el archivo (${response.status})`);
   }
 
-  const data = (await response.json()) as { url?: string; error?: string };
-
-  if (!data.url) {
-    throw new Error(data.error || 'El servidor no devolvio una URL valida');
+  const url = body.data?.url ?? body.url;
+  if (!url) {
+    throw new Error(body.error || 'El servidor no devolvio una URL valida');
   }
 
-  return data.url;
+  return url;
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from '@/hooks/use-auth';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { useApi } from '@/hooks/use-api';
@@ -18,6 +18,8 @@ import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { addMonths, format, parseISO, isValid } from 'date-fns';
+import { uploadToHostinger, MAX_UPLOAD_BYTES } from '@/lib/upload-service';
+import { getProxyUrl } from '@/lib/file-url';
 
 type SaveUserPayload = {
   id?: string;
@@ -61,6 +63,8 @@ function UsersContent() {
   const [isOpen, setIsOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [isValidatingDni, setIsValidatingDni] = useState(false);
   const [isBillingScheduleDirty, setIsBillingScheduleDirty] = useState(false);
   const todayDate = new Date().toISOString().split('T')[0];
@@ -130,22 +134,58 @@ function UsersContent() {
     }
   };
 
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 2 * 1024 * 1024) {
-        toast({ variant: "destructive", title: "Archivo demasiado grande", description: "El límite es 2MB." });
-        return;
-      }
-      const reader = new FileReader();
-      reader.onloadend = () => setPhotoPreview(reader.result as string);
-      reader.readAsDataURL(file);
+  useEffect(() => {
+    if (!photoPreview?.startsWith('blob:')) return;
+    return () => {
+      URL.revokeObjectURL(photoPreview);
+    };
+  }, [photoPreview]);
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.target;
+    const file = input.files?.[0];
+    if (!file) return;
+
+    if (file.size > MAX_UPLOAD_BYTES) {
+      toast({ variant: "destructive", title: "Archivo demasiado grande", description: "El límite es 2MB." });
+      input.value = '';
+      return;
+    }
+
+    const previousPreview = photoPreview;
+    const localPreview = URL.createObjectURL(file);
+    setPhotoPreview(localPreview);
+    setIsUploadingPhoto(true);
+
+    try {
+      const uploadedUrl = await uploadToHostinger(file);
+      setPhotoUrl(uploadedUrl);
+      setPhotoPreview(getProxyUrl(uploadedUrl));
+    } catch (error) {
+      setPhotoPreview(previousPreview);
+      toast({
+        variant: 'destructive',
+        title: 'Error al subir foto',
+        description: error instanceof Error ? error.message : 'No se pudo subir la foto.',
+      });
+    } finally {
+      setIsUploadingPhoto(false);
+      input.value = '';
     }
   };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentUser) return;
+
+    if (isUploadingPhoto) {
+      toast({
+        variant: 'destructive',
+        title: 'Foto en proceso',
+        description: 'Espere a que termine la subida de la foto antes de guardar.',
+      });
+      return;
+    }
 
     const isAdmin = currentUser.role === 'admin';
     const normalizedDni = form.dni.replace(/\D/g, '');
@@ -183,7 +223,7 @@ function UsersContent() {
       dni: normalizedDni,
       address: form.address,
       colegiatura: form.colegiatura,
-      photo: photoPreview || undefined,
+      photo: photoUrl || undefined,
       role: isAdmin ? 'clinic' : form.role,
       subscriptionFee: isAdmin ? (parseFloat(form.subscriptionFee) || 0) : undefined,
       subscriptionStatus: form.subscriptionStatus,
@@ -266,6 +306,8 @@ function UsersContent() {
   const resetForm = () => {
     setEditingId(null);
     setPhotoPreview(null);
+    setPhotoUrl(null);
+    setIsUploadingPhoto(false);
     setIsBillingScheduleDirty(false);
     setForm({ 
       username: '', 
@@ -322,7 +364,8 @@ function UsersContent() {
       advanceInstallments: '1',
       subscriptionStatus: u.subscriptionStatus
     });
-    setPhotoPreview(u.photo || null);
+    setPhotoUrl(u.photo || null);
+    setPhotoPreview(getProxyUrl(u.photo) || null);
     setIsOpen(true);
   };
 
@@ -393,9 +436,20 @@ function UsersContent() {
                         {isAdmin ? <Building2 className="w-14 h-14" /> : <UserIcon className="w-14 h-14" />}
                       </AvatarFallback>
                     </Avatar>
-                    <label className="absolute -bottom-2 -right-2 p-3 bg-primary rounded-2xl text-white cursor-pointer hover:bg-primary/90 transition-all shadow-xl hover:scale-110 active:scale-90 ring-4 ring-white dark:ring-slate-800">
-                      <Camera className="w-6 h-6" />
-                      <input type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
+                    <label className={cn(
+                      "absolute -bottom-2 -right-2 p-3 bg-primary rounded-2xl text-white transition-all shadow-xl ring-4 ring-white dark:ring-slate-800",
+                      isUploadingPhoto
+                        ? "cursor-wait opacity-90"
+                        : "cursor-pointer hover:bg-primary/90 hover:scale-110 active:scale-90"
+                    )}>
+                      {isUploadingPhoto ? <Loader2 className="w-6 h-6 animate-spin" /> : <Camera className="w-6 h-6" />}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handlePhotoUpload}
+                        disabled={isUploadingPhoto}
+                      />
                     </label>
                   </div>
                 </div>
@@ -617,7 +671,7 @@ function UsersContent() {
                <div className={cn("h-3 w-full", u.subscriptionStatus === 'active' ? 'bg-emerald-500' : u.subscriptionStatus === 'suspended' ? 'bg-amber-500' : 'bg-red-600')} />
                <CardHeader className="flex flex-row items-start gap-5 p-8 pb-4">
                  <Avatar className="w-20 h-20 rounded-3xl shadow-xl ring-4 ring-white dark:ring-slate-900">
-                   <AvatarImage src={u.photo || undefined} className="object-cover" />
+                   <AvatarImage src={getProxyUrl(u.photo)} className="object-cover" />
                    <AvatarFallback className="bg-primary/5 text-primary">
                      {u.role === 'clinic' ? <Building2 className="w-10 h-10" /> : u.role === 'doctor' ? <Stethoscope className="w-10 h-10" /> : <Briefcase className="w-10 h-10" />}
                    </AvatarFallback>

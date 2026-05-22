@@ -17,6 +17,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PaymentModal } from '../../../components/PaymentModal';
+import { getProxyUrl } from '@/lib/file-url';
 
 type ApiEnvelope<T> = {
   success?: boolean;
@@ -387,16 +388,6 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
       });
     }
     e.target.value = ''; 
-  };
-
-  const getProxyUrl = (fileUrl: string): string => {
-    try {
-      const url = new URL(fileUrl);
-      const path = url.pathname.replace(/^\//, '');
-      return `/api/files/download?path=${encodeURIComponent(path)}`;
-    } catch {
-      return fileUrl;
-    }
   };
 
   const downloadFile = (fileUrl: string, fileName: string) => {
