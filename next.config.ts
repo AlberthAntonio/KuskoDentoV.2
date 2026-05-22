@@ -30,7 +30,13 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   productionBrowserSourceMaps: false,
-  
+
+  api: {
+    bodyParser: {
+      sizeLimit: '20mb',
+    },
+  },
+
   // Te recomiendo envolver esto en un condicional si usas subida de archivos o optimizaciones pesadas
   images: {
     deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840], // Opcional: Controla los tamaños de imágenes generados
