@@ -143,6 +143,18 @@ function UsersContent() {
     }
   };
 
+  const dataUrlToBlob = (dataUrl: string): Blob => {
+    const arr = dataUrl.split(',');
+    const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/jpeg';
+    const bstr = atob(arr[1]);
+    const n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    for (let i = 0; i < n; i++) {
+      u8arr[i] = bstr.charCodeAt(i);
+    }
+    return new Blob([u8arr], { type: mime });
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentUser) return;
@@ -150,7 +162,7 @@ function UsersContent() {
     let photoUrl: string | undefined;
     if (photoPreview && photoPreview.startsWith('data:')) {
       try {
-        const blob = await (await fetch(photoPreview)).blob();
+        const blob = dataUrlToBlob(photoPreview);
         const formData = new FormData();
         formData.append('file', blob, 'photo.jpg');
 
@@ -162,6 +174,9 @@ function UsersContent() {
         if (uploadRes.ok) {
           const uploadData = await uploadRes.json();
           photoUrl = uploadData.data?.url;
+        } else {
+          const errorData = await uploadRes.json();
+          throw new Error(errorData.error || 'Error al subir archivo');
         }
       } catch (error) {
         toast({
@@ -169,6 +184,7 @@ function UsersContent() {
           title: 'Error al subir foto',
           description: error instanceof Error ? error.message : 'No se pudo subir la foto',
         });
+        return;
       }
     }
 
