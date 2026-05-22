@@ -31,9 +31,9 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   productionBrowserSourceMaps: false,
 
-  api: {
-    bodyParser: {
-      sizeLimit: '20mb',
+  experimental: {
+    serverActions: {
+      bodySizeLimit: '25mb',
     },
   },
 

@@ -3,7 +3,7 @@ import { getRequestContext } from '@/lib/request-context';
 
 const HOSTINGER_URL = 'https://api.cuscodento.com/subir_archivo.php';
 const UPLOAD_SECRET = process.env.UPLOAD_SECRET ?? process.env.NEXT_PUBLIC_UPLOAD_SECRET ?? '';
-const MAX_UPLOAD_BYTES = 2 * 1024 * 1024;
+const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
 const ALLOWED_MIME = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml', 'application/pdf']);
 
 export async function POST(request: Request) {
@@ -17,7 +17,7 @@ export async function POST(request: Request) {
     const file = formData.get('archivo') as File | null;
 
     if (!file) return apiError('No se recibio el archivo', 400);
-    if (file.size > MAX_UPLOAD_BYTES) return apiError('El archivo supera el limite de 2MB', 400);
+    if (file.size > MAX_UPLOAD_BYTES) return apiError('El archivo supera el limite de 20MB', 400);
     if (file.type && !ALLOWED_MIME.has(file.type)) return apiError('Tipo de archivo no permitido', 415);
 
     const hostingerForm = new FormData();
