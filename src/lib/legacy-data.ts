@@ -1,5 +1,7 @@
 "use client";
 
+import { uploadToHostinger } from '@/lib/upload-service';
+
 type ApiEnvelope<T> = {
   success?: boolean;
   data?: T;
@@ -47,40 +49,6 @@ const toDate = (value?: string | null) => {
   return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleDateString('es-PE');
 };
 
-function blobToDataUrl(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      if (typeof reader.result === 'string') {
-        resolve(reader.result);
-      } else {
-        reject(new Error('No se pudo convertir archivo'));
-      }
-    };
-    reader.onerror = () => reject(new Error('No se pudo leer archivo'));
-    reader.readAsDataURL(blob);
-  });
-}
-
-function dataUrlToBlob(dataUrl: string, fallbackType = 'application/octet-stream'): Blob {
-  const parts = dataUrl.split(',');
-  if (parts.length < 2) {
-    return new Blob([dataUrl], { type: fallbackType });
-  }
-
-  const header = parts[0];
-  const body = parts[1];
-  const mimeMatch = header.match(/data:(.*?);base64/);
-  const mimeType = mimeMatch?.[1] || fallbackType;
-
-  const binary = atob(body);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i += 1) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-
-  return new Blob([bytes], { type: mimeType });
-}
 
 function splitName(fullName: string): { names: string; lastNames: string } {
   const chunks = fullName.trim().split(/\s+/).filter(Boolean);
@@ -192,7 +160,7 @@ export interface Consent {
   patientId: string;
   type: string;
   date: string;
-  fileBlob: Blob;
+  fileUrl: string;
   fileType: string;
   fileName: string;
 }
@@ -212,7 +180,6 @@ export interface Radiograph {
   type?: string;
   clinicId?: string;
   date: string;
-  fileBlob: Blob;
   fileType: string;
   fileName: string;
 }
@@ -473,18 +440,19 @@ export const db = {
           clinic_id: string;
         }> }>('/api/radiographs');
 
-        const items = (data.items || []).map((item) => ({
-          id: item.id,
-          patientId: item.patient_id,
-          appointmentId: item.appointment_id || undefined,
-          fileUrl: item.file_url,
-          type: item.type || undefined,
-          clinicId: item.clinic_id,
-          date: toDate(item.created_at),
-          fileBlob: dataUrlToBlob(item.file_url, item.mime_type || 'image/*'),
-          fileType: item.mime_type || 'image/*',
-          fileName: item.file_name,
-        }));
+        const items = (data.items || [])
+          .filter((item) => Boolean(item.file_url))
+          .map((item) => ({
+            id: item.id,
+            patientId: item.patient_id,
+            appointmentId: item.appointment_id || undefined,
+            fileUrl: item.file_url,
+            type: item.type || undefined,
+            clinicId: item.clinic_id,
+            date: toDate(item.created_at),
+            fileType: item.mime_type || 'image/*',
+            fileName: item.file_name,
+          }));
 
         return items as T[];
       }
@@ -505,8 +473,8 @@ export const db = {
             patientId: item.patient_id,
             type: item.consent_type,
             date: toDate(item.accepted_at),
-            fileBlob: dataUrlToBlob(item.document_url as string),
-            fileType: (item.document_url || '').split(';')[0].replace('data:', '') || 'application/pdf',
+            fileUrl: item.document_url as string,
+            fileType: item.consent_type.toLowerCase().includes('pdf') ? 'application/pdf' : 'image/*',
             fileName: item.consent_type,
           }));
 
@@ -673,12 +641,12 @@ export const db = {
     }
 
     if ((table === 'radiographs' || table === 'consents') && payload) {
-      const fileBlob = payload.fileBlob instanceof Blob ? payload.fileBlob : null;
-      if (!fileBlob) {
+      const file = payload.fileBlob instanceof File ? payload.fileBlob : null;
+      if (!file) {
         throw new Error('Archivo invalido');
       }
 
-      const fileUrl = await blobToDataUrl(fileBlob);
+      const fileUrl = await uploadToHostinger(file);
 
       if (table === 'radiographs') {
         const response = await fetch('/api/radiographs', {
@@ -692,7 +660,7 @@ export const db = {
             appointment_id: payload.appointmentId,
             file_url: fileUrl,
             file_name: payload.fileName,
-            file_size: Number(fileBlob.size || 0),
+            file_size: file.size,
             mime_type: payload.fileType,
             type: payload.type,
           }),

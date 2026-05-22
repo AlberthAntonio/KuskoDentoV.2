@@ -249,7 +249,7 @@ export function AppLayout({ children, setIsPayModalOpen: setIsPayModalOpenProp }
             {user.photo ? (
               isClinic ? (
                 <div className="h-20 w-full flex items-center justify-start px-2 mb-2">
-                  <div className="h- w- rounded-full overflow-hidden border border-white/60 shadow-md">
+                  <div className="h-16 w-16 rounded-full overflow-hidden border border-white/60 shadow-md flex-shrink-0">
                     <img src={user.photo} className="h-full w-full object-cover" alt="Logo de la Clínica" />
                   </div>
                 </div>

@@ -6,12 +6,12 @@ import { radiographService } from '@/services/radiograph.service';
 const CreateRadiographSchema = z.object({
   patient_id: z.string().cuid(),
   appointment_id: z.string().cuid().optional(),
-  file_url: z.string().min(10),
-  file_name: z.string().min(1),
+  file_url: z.string().url('La URL del archivo no es válida').max(500),
+  file_name: z.string().min(1).max(255),
   file_size: z.number().int().nonnegative(),
-  mime_type: z.string().optional(),
-  type: z.string().optional(),
-  notes: z.string().optional(),
+  mime_type: z.string().max(100).optional(),
+  type: z.string().max(100).optional(),
+  notes: z.string().max(1000).optional(),
 });
 
 function resolveStatus(message: string): number {

@@ -304,9 +304,12 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
           })
       );
 
-      // No existen endpoints REST para estos modulos en la version actual.
-      setRadiographs([]);
-      setConsents([]);
+      const [allRadiographs, allConsents] = await Promise.all([
+        db.getAll<Radiograph>('radiographs').catch(() => []),
+        db.getAll<Consent>('consents').catch(() => []),
+      ]);
+      setRadiographs(allRadiographs.filter((r) => r.patientId === id));
+      setConsents(allConsents.filter((c) => c.patientId === id));
       setOdontograms(
         (odontogramsApi.items || [])
           .sort((a, b) => parseDateValue(b.created_at) - parseDateValue(a.created_at))
@@ -334,12 +337,40 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
     const file = e.target.files?.[0];
     if (!file) return;
 
+    const ALLOWED_RADIOGRAPH = ['image/jpeg', 'image/png', 'image/webp', 'image/tiff', 'image/gif', 'image/bmp'];
+    const ALLOWED_CONSENT = [...ALLOWED_RADIOGRAPH, 'application/pdf'];
+    const MAX_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
+
+    const allowed = type === 'radiograph' ? ALLOWED_RADIOGRAPH : ALLOWED_CONSENT;
+
+    if (!allowed.includes(file.type)) {
+      const label = type === 'radiograph' ? 'Radiografía' : 'Consentimiento';
+      const formats = type === 'radiograph' ? 'JPG, PNG, WEBP, TIFF' : 'JPG, PNG, WEBP, PDF';
+      toast({
+        title: `Formato no permitido`,
+        description: `${label}: solo se aceptan ${formats}.`,
+        variant: 'destructive',
+      });
+      e.target.value = '';
+      return;
+    }
+
+    if (file.size > MAX_SIZE_BYTES) {
+      toast({
+        title: 'Archivo demasiado grande',
+        description: `El tamaño máximo permitido es 10 MB. Tu archivo pesa ${(file.size / 1024 / 1024).toFixed(1)} MB.`,
+        variant: 'destructive',
+      });
+      e.target.value = '';
+      return;
+    }
+
     const data: any = {
       id: crypto.randomUUID(),
       patientId: id,
       fileName: file.name,
       fileType: file.type,
-      fileBlob: file, 
+      fileBlob: file,
       date: new Date().toLocaleDateString('es-PE'),
     };
 
@@ -350,26 +381,24 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
       loadAll();
     } catch (error) {
       toast({
-        title: 'Modulo en migracion',
-        description: error instanceof Error ? error.message : 'Aun no se pudo guardar este archivo.',
+        title: 'Error al subir archivo',
+        description: error instanceof Error ? error.message : 'No se pudo guardar el archivo.',
         variant: 'destructive',
       });
     }
     e.target.value = ''; 
   };
 
-  const downloadFile = (fileBlob: Blob, fileName: string) => {
-    const url = URL.createObjectURL(fileBlob);
+  const downloadFile = (fileUrl: string, fileName: string) => {
     const a = document.createElement('a');
-    a.href = url;
+    a.href = fileUrl;
     a.download = fileName;
+    a.target = '_blank';
     a.click();
-    URL.revokeObjectURL(url);
   };
 
-  const openPreview = (fileBlob: Blob, fileType: string) => {
-    const url = URL.createObjectURL(fileBlob);
-    setPreviewData({ url, type: fileType });
+  const openPreview = (fileUrl: string, fileType: string) => {
+    setPreviewData({ url: fileUrl, type: fileType });
   };
 
   const deleteFile = async (store: 'radiographs' | 'consents', fileId: string) => {
@@ -649,12 +678,11 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
                    {radiographs.map(r => (
                      <Card key={r.id} className="overflow-hidden group relative border-none shadow-sm hover:shadow-md transition-all">
-                       <div className="aspect-square bg-slate-100 flex items-center justify-center overflow-hidden cursor-pointer" onClick={() => openPreview(r.fileBlob, r.fileType)}>
-                          <img 
-                            src={URL.createObjectURL(r.fileBlob)} 
-                            className="w-full h-full object-cover transition-transform group-hover:scale-105" 
+                       <div className="aspect-square bg-slate-100 flex items-center justify-center overflow-hidden cursor-pointer" onClick={() => openPreview(r.fileUrl, r.fileType)}>
+                          <img
+                            src={r.fileUrl}
+                            className="w-full h-full object-cover transition-transform group-hover:scale-105"
                             alt={r.fileName}
-                            onLoad={(e) => URL.revokeObjectURL((e.target as any).src)}
                           />
                           <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                             <ZoomIn className="text-white w-8 h-8" />
@@ -665,7 +693,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
                           <p className="text-[9px] text-muted-foreground">{r.date}</p>
                        </div>
                        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
-                         <Button variant="secondary" size="icon" className="h-7 w-7" onClick={() => downloadFile(r.fileBlob, r.fileName)}><Download className="w-3 h-3" /></Button>
+                         <Button variant="secondary" size="icon" className="h-7 w-7" onClick={() => downloadFile(r.fileUrl, r.fileName)}><Download className="w-3 h-3" /></Button>
                          <Button variant="destructive" size="icon" className="h-7 w-7" onClick={() => deleteFile('radiographs', r.id)}><Trash2 className="w-3 h-3" /></Button>
                        </div>
                      </Card>
@@ -706,7 +734,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
                           </div>
                        </div>
                        <div className="flex gap-2">
-                          <Button variant="ghost" size="sm" onClick={() => openPreview(c.fileBlob, c.fileType)}>Previsualizar</Button>
+                          <Button variant="ghost" size="sm" onClick={() => openPreview(c.fileUrl, c.fileType)}>Previsualizar</Button>
                           <Button variant="ghost" size="icon" className="text-destructive opacity-0 group-hover:opacity-100" onClick={() => deleteFile('consents', c.id)}><Trash2 className="w-4 h-4" /></Button>
                        </div>
                      </Card>

@@ -6,9 +6,9 @@ import { consentService } from '@/services/consent.service';
 const CreateConsentSchema = z.object({
   patient_id: z.string().cuid(),
   appointment_id: z.string().cuid().optional(),
-  consent_type: z.string().min(2),
-  document_url: z.string().min(10),
-  notes: z.string().optional(),
+  consent_type: z.string().min(2).max(255),
+  document_url: z.string().url('La URL del documento no es válida').max(500),
+  notes: z.string().max(1000).optional(),
 });
 
 function resolveStatus(message: string): number {

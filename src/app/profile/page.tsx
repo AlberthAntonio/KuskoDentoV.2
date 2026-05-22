@@ -192,11 +192,32 @@ function ProfileContent() {
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => setPhotoPreview(reader.result as string);
-      reader.readAsDataURL(file);
+    if (!file) return;
+
+    const ALLOWED = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml'];
+    const MAX_SIZE_BYTES = 2 * 1024 * 1024; // 2 MB
+
+    if (!ALLOWED.includes(file.type)) {
+      toast({ variant: 'destructive', title: 'Formato no permitido', description: 'El logo debe ser JPG, PNG, WEBP, GIF o SVG.' });
+      e.target.value = '';
+      return;
     }
+    if (file.size > MAX_SIZE_BYTES) {
+      toast({ variant: 'destructive', title: 'Logo demasiado grande', description: `Máximo 2 MB. Tu archivo pesa ${(file.size / 1024 / 1024).toFixed(1)} MB.` });
+      e.target.value = '';
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      if (typeof reader.result === 'string') {
+        setPhotoPreview(reader.result);
+      }
+    };
+    reader.onerror = () => {
+      toast({ variant: 'destructive', title: 'Error al leer imagen', description: 'No se pudo cargar el archivo seleccionado.' });
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleAddMethod = async (e: React.FormEvent) => {

@@ -234,7 +234,7 @@ model Radiograph {
   clinic_id      String
   patient_id     String
   appointment_id String?
-  file_url       String
+  file_url       String        @db.LongText
   file_name      String
   file_size      Int
   mime_type      String?
@@ -277,7 +277,7 @@ model Consent {
   accepted       Boolean      @default(false)
   accepted_at    DateTime?
   signed_by      String?
-  document_url   String?
+  document_url   String?       @db.LongText
   notes          String?
   created_at     DateTime     @default(now())
   updated_at     DateTime     @updatedAt
