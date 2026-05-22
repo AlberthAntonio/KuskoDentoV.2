@@ -1,0 +1,41 @@
+import { apiError, apiOk } from '@/lib/api-response';
+import { getRequestContext } from '@/lib/request-context';
+
+const HOSTINGER_URL = 'https://api.cuscodento.com/subir_archivo.php';
+const UPLOAD_SECRET = process.env.NEXT_PUBLIC_UPLOAD_SECRET ?? '';
+
+export async function POST(request: Request) {
+  try {
+    const { clinicId } = await getRequestContext();
+    if (!clinicId) return apiError('No autorizado', 401);
+
+    const formData = await request.formData();
+    const file = formData.get('archivo') as File | null;
+
+    if (!file) return apiError('No se recibio el archivo', 400);
+
+    const hostingerForm = new FormData();
+    hostingerForm.append('archivo', file);
+
+    const hostingerRes = await fetch(HOSTINGER_URL, {
+      method: 'POST',
+      headers: { Authorization: UPLOAD_SECRET },
+      body: hostingerForm,
+    });
+
+    if (!hostingerRes.ok) {
+      return apiError(`Error del servidor de archivos (${hostingerRes.status})`, 502);
+    }
+
+    const data = (await hostingerRes.json()) as { success: boolean; url?: string; error?: string };
+
+    if (!data.success || !data.url) {
+      return apiError(data.error || 'El servidor no devolvio una URL valida', 502);
+    }
+
+    return apiOk({ url: data.url });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Error interno';
+    return apiError(message, 500);
+  }
+}
