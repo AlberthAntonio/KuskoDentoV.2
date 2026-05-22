@@ -1,21 +1,7 @@
 import type { NextConfig } from 'next';
-// 1. Definimos una Content Security Policy (CSP) robusta adaptada para Next.js
-const cspHeader = `
-  default-src 'self';
-  script-src 'self' 'unsafe-eval' 'unsafe-inline';
-  style-src 'self' 'unsafe-inline';
-  img-src 'self' blob: data: https://images.unsplash.com https://picsum.photos https://placehold.co;
-  font-src 'self' data:;
-  connect-src 'self' ws: wss:;
-  object-src 'none';
-  base-uri 'self';
-  form-action 'self';
-  frame-ancestors 'none';
-  upgrade-insecure-requests;
-`.replace(/\s{2,}/g, ' ').trim(); // Limpia los espacios y saltos de línea
 
+// CSP se define dinamicamente en middleware.ts (con nonce). Aqui solo los demas headers.
 const baseSecurityHeaders = [
-  { key: 'Content-Security-Policy', value: cspHeader },
   { key: 'X-Content-Type-Options', value: 'nosniff' },
   { key: 'X-Frame-Options', value: 'DENY' },
   { key: 'X-XSS-Protection', value: '1; mode=block' },
