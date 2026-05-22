@@ -1,4 +1,4 @@
-export const MAX_UPLOAD_BYTES = 2 * 1024 * 1024;
+export const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
 
 type ApiEnvelope<T> = {
   success?: boolean;
@@ -8,7 +8,7 @@ type ApiEnvelope<T> = {
 
 export async function uploadToHostinger(file: File): Promise<string> {
   if (file.size > MAX_UPLOAD_BYTES) {
-    throw new Error('El archivo supera el limite de 2MB');
+    throw new Error('El archivo supera el limite de 20MB');
   }
 
   const formData = new FormData();
